@@ -54,6 +54,17 @@ allow. The Vulkan loader (`vulkan-1.dll`) comes with the graphics driver and is 
 | Gemma 4 26B A4B instruct, GGUF quantization by Unsloth (`gemma-4-26B-A4B-it-UD-Q4_K_M.gguf`) | revision pinned in `llm_local.py` | Apache-2.0, per the model card | https://huggingface.co/unsloth (Google's Gemma 4 release) | Upstream: check the model card and its licence file before release |
 | BAAI bge-small-en-v1.5 (ONNX), meaning-based search | as pinned | MIT, per the model card | https://huggingface.co/BAAI/bge-small-en-v1.5 | Upstream: the local copy has no licence file beside it |
 
+## Development and test tools (not bundled, not downloaded by the apps)
+
+These are used only to run optional tests from a checkout. They are not in any package, are not required to build or
+run Lastbook, and the build's package scan rejects test code. All of them work offline once installed.
+
+| Component | Used by | Licence | Source | Checked |
+|---|---|---|---|---|
+| Playwright for Python (`pip install playwright`; the wheel carries its own Node.js driver). Run it against a Chromium you already have, so no browser download is needed | `app/tests/i18n_browser.py` | Apache-2.0 | https://github.com/microsoft/playwright-python | Checked: package metadata of 1.65.2 (`License-Expression: Apache-2.0`) |
+| pyatspi (Ubuntu package `python3-pyatspi`, part of at-spi2) | `app/tests/linux_i18n_smoke.py`, `app/tests/linux_at.py` | LGPL-2.0-or-later | https://gitlab.gnome.org/GNOME/at-spi2-core | Upstream |
+| xdotool (Ubuntu package `xdotool`) | `app/tests/linux_i18n_smoke.py` | BSD-3-Clause | https://github.com/jordansissel/xdotool | Upstream |
+
 ## iPad development preview (`mobile/ipad/`)
 
 There is no published iPad build. These parts go into an iPad app that a contributor builds from this source.

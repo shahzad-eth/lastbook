@@ -5,7 +5,8 @@
 
 The script runs from a copy in a temporary folder, so the plugin it "builds" lands there and never in the checkout's derived/gst/.
 PATH holds only the stand-ins and the few system tools the script uses, so a gst-discoverer-1.0 installed on this computer is not seen.
-Skipped where there is no bash (Windows). Never packaged."""
+Skipped where there is no bash, and on Windows even with Git Bash: the script is for Linux, and the stand-in folder is made of
+symbolic links, which Windows refuses to an ordinary account. Never packaged."""
 import os, shutil, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
@@ -21,6 +22,7 @@ OK = '#!/bin/sh\nexit 0\n'
 INSPECT = '#!/bin/sh\n[ "$1" = --exists ] && case " $GST_MISSING " in *" $2 "*) exit 1;; esac\nexit 0\n'
 
 
+@unittest.skipIf(sys.platform == 'win32', 'the script is for Linux; not run on Windows, where Git Bash would otherwise be found')
 @unittest.skipUnless(shutil.which('bash') and all(shutil.which(t) for t in SYSTEM_TOOLS), 'needs bash and coreutils')
 class Check(unittest.TestCase):
     def setUp(self):

@@ -698,7 +698,7 @@ class Pace:
 
 
 class Shell:
-    def __init__(self, server_module, data):
+    def __init__(self, server_module, data, *, language_file=None):
         self.n = net()
         spool = Path(data) / 'derived' / 'spool'
         spool.mkdir(parents=True, exist_ok=True)
@@ -710,7 +710,8 @@ class Shell:
                 pass
         self.store = Path(data) / 'derived' / 'webview'
         physical = _Processes().physical() or 2 * WHOLE_COPIES * B.WHOLE_MAX
-        self.b = B.Bridge(server_module, 'buffer', B.ORIGIN_WINDOWS, tmpdir=str(spool), whole_max=min(B.WHOLE_MAX, physical // (2 * WHOLE_COPIES)))
+        self.b = B.Bridge(server_module, 'buffer', B.ORIGIN_WINDOWS, tmpdir=str(spool),
+                          whole_max=min(B.WHOLE_MAX, physical // (2 * WHOLE_COPIES)), language_file=language_file)
         self.core = self.env = self.form = self.view = None
         self.frames = set()     # pythonnet would let these go otherwise, and with them the frame's event
         self.pace = Pace(PACE_BYTES)
@@ -1203,10 +1204,10 @@ def collect_loop(GC):
             limit = max(HEAP_SOFT, GC.GetTotalMemory(False) * 2)
 
 
-def run(server_module, data):
+def run(server_module, data, *, language_file=None):
     """Blocks until the window closes. WinForms and WebView2 need a single-threaded apartment, which Python's main thread is not."""
     ctypes.windll.user32.SetProcessDPIAware()
-    shell = Shell(server_module, data)
+    shell = Shell(server_module, data, language_file=language_file)
     failure = []
 
     def body():

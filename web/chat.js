@@ -115,7 +115,7 @@ const Chat = (() => {
     const gb = n => (n / 1e9).toFixed(0) + ' GB';
     return ({
       ready: [true, 'Local AI ready'],
-      stopped: [true, 'Local AI ready · it starts when you ask'],
+      stopped: [true, 'Local AI available · your first question loads it and may take a while'],
       loading: [true, `Starting the local AI${l.pct ? ' ' + l.pct + '%' : '…'}`],
       checking: [false, `Checking the local AI file${l.pct != null ? ' ' + l.pct + '%' : '…'}`],
       measuring: [false, 'Checking this computer’s memory…'],

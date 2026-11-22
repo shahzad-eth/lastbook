@@ -17,12 +17,12 @@ import hashlib, html, json, pathlib, re
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SITE = "https://lastbook.org"
 R2 = "https://downloads.lastbook.org"
-MAC = R2 + "/Lastbook-1.1.14-mac.dmg"
-WIN = R2 + "/Lastbook-1.1.14-Setup.exe"
+MAC = R2 + "/Lastbook-1.1.15-mac.dmg"
+WIN = R2 + "/Lastbook-1.1.15-Setup.exe"
 # One Linux entry point: the home page links to the Linux install card, which offers the package for each Ubuntu release.
 LINUX = "/download/#linux"
-DEB_2404 = R2 + "/Lastbook_1.1.14_amd64.deb"
-DEB_2604 = R2 + "/Lastbook_1.1.14_ubuntu26.04_amd64.deb"
+DEB_2404 = R2 + "/Lastbook_1.1.15_amd64.deb"
+DEB_2604 = R2 + "/Lastbook_1.1.15_ubuntu26.04_amd64.deb"
 LIB = R2 + "/Lastbook-Small-20261113.zip"
 DATE = "13 November 2026"
 
@@ -151,11 +151,11 @@ def pic(stem, w, h, alt, widths=(720, 1280), sizes="92vw", fallback=None, eager=
     </picture>"""
 
 
-MAC_BTN = btn(MAC, APPLE, "Download for Mac", "Lastbook 1.1.14 · 28.6 MB")
-WIN_BTN = btn(WIN, WINDOWS, "Download for Windows", "Lastbook 1.1.14 · 105 MB")
-LINUX_BTN = btn(LINUX, BOX, "Download for Linux", "Lastbook 1.1.14 · Ubuntu 24.04 or 26.04")
-DEB_2404_BTN = btn(DEB_2404, BOX, "Ubuntu 24.04", "Lastbook 1.1.14 · 30.0 MB")
-DEB_2604_BTN = btn(DEB_2604, BOX, "Ubuntu 26.04", "Lastbook 1.1.14 · 30.1 MB", "btn-2")
+MAC_BTN = btn(MAC, APPLE, "Download for Mac", "Lastbook 1.1.15 · 28.6 MB")
+WIN_BTN = btn(WIN, WINDOWS, "Download for Windows", "Lastbook 1.1.15 · 105 MB")
+LINUX_BTN = btn(LINUX, BOX, "Download for Linux", "Lastbook 1.1.15 · Ubuntu 24.04 or 26.04")
+DEB_2404_BTN = btn(DEB_2404, BOX, "Ubuntu 24.04", "Lastbook 1.1.15 · 30.1 MB")
+DEB_2604_BTN = btn(DEB_2604, BOX, "Ubuntu 26.04", "Lastbook 1.1.15 · 30.1 MB", "btn-2")
 LIB_BTN = btn(LIB, BOX, "Download the library", "Small · 7.7 GB", "btn-2")
 LIB_BTN_SHORT = btn(LIB, BOX, "Download the library", "Small · 7.7 GB", "btn-2")
 MAC_FINE = "Free · Apple M1 or newer · macOS 14 or newer"
@@ -189,7 +189,7 @@ AGAIN = f"""<section class="band band-lamp" aria-labelledby="again-h">
       <a class="btn-2 dl-win" href="{WIN}">Download for Windows</a>
       <a class="btn-2 dl-linux" href="{LINUX}">Download for Linux</a>
     </p>
-    <p class="fine">Mac 1.1.14 · 28.6 MB · Windows 1.1.14 · 105 MB · Linux 1.1.14 · 30.0 MB</p>
+    <p class="fine">Mac 1.1.15 · 28.6 MB · Windows 1.1.15 · 105 MB · Linux 1.1.15 · 30.1 MB</p>
   </div>
 </section>
 """
@@ -459,21 +459,21 @@ def download():
 {page_head("Download Lastbook", "Install the app, then choose your library, local map and optional AI.", "fig-laptop")}
 {PHONE}
 <ul class="files" id="need">
-<li class="card file dl-mac"><h2>Mac</h2><p class="file-name">Lastbook 1.1.14 · 28.6 MB</p><p class="req">Apple Silicon (M1 or newer) · macOS 14 or newer</p>{MAC_BTN}<p>Setup checks your storage and downloads your library and optional local AI.</p></li>
-<li class="card file dl-win"><h2>Windows</h2><p class="file-name">Lastbook 1.1.14 · 105 MB</p><p class="req">Windows 10 or 11 · 64-bit</p>{WIN_BTN}<p>Setup lets you choose your library size, local map and optional local AI.</p></li>
-<li class="card file dl-linux" id="linux"><h2>Linux</h2><p class="file-name">Lastbook 1.1.14 · 30.0 MB</p><p class="req">Ubuntu 24.04 or 26.04 · Intel/AMD 64-bit</p>{DEB_2404_BTN}{DEB_2604_BTN}<p>Choose your library, state map and optional local AI during setup.</p></li>
+<li class="card file dl-mac"><h2>Mac</h2><p class="file-name">Lastbook 1.1.15 · 28.6 MB</p><p class="req">Apple Silicon (M1 or newer) · macOS 14 or newer</p>{MAC_BTN}<p>Setup checks your storage and downloads your library and optional local AI.</p></li>
+<li class="card file dl-win"><h2>Windows</h2><p class="file-name">Lastbook 1.1.15 · 105 MB</p><p class="req">Windows 10 or 11 · 64-bit</p>{WIN_BTN}<p>Setup lets you choose your library size, local map and optional local AI.</p></li>
+<li class="card file dl-linux" id="linux"><h2>Linux</h2><p class="file-name">Lastbook 1.1.15 · 30.1 MB</p><p class="req">Ubuntu 24.04 or 26.04 · Intel/AMD 64-bit</p>{DEB_2404_BTN}{DEB_2604_BTN}<p>Choose your library, state map and optional local AI during setup.</p></li>
 </ul>
 <div class="os">
 <section class="card os-card dl-mac" id="mac" aria-labelledby="mac-h">
 <h2 id="mac-h">{APPLE} Install on Mac</h2>
-<ol class="list"><li>Open <b>Lastbook-1.1.14-mac.dmg</b>.</li><li>Drag <b>Lastbook</b> to <b>Applications</b>.</li><li>Open <b>Lastbook</b> from Applications.</li><li>Choose your state for a detailed local map, then your library size and optional local AI. Setup shows the space needed.</li><li>Click <b>Install</b> and keep your internet connection on until setup finishes.</li></ol>
-<details class="ver" id="why"><summary>Apple security checks</summary><div><p>Lastbook 1.1.14 is signed with our Developer ID and notarized by Apple. On first launch, macOS may ask you to confirm opening an app downloaded from the internet.</p></div></details>
+<ol class="list"><li>Open <b>Lastbook-1.1.15-mac.dmg</b>.</li><li>Drag <b>Lastbook</b> to <b>Applications</b>.</li><li>Open <b>Lastbook</b> from Applications.</li><li>Choose your state for a detailed local map, then your library size and optional local AI. Setup shows the space needed.</li><li>Click <b>Install</b> and keep your internet connection on until setup finishes.</li></ol>
+<details class="ver" id="why"><summary>Apple security checks</summary><div><p>Lastbook 1.1.15 is signed with our Developer ID and notarized by Apple. On first launch, macOS may ask you to confirm opening an app downloaded from the internet.</p></div></details>
 <p>Once setup finishes, the library and AI work offline.</p>
 </section>
-<section class="card os-card dl-win" id="windows" aria-labelledby="win-h"><h2 id="win-h">{WINDOWS} Install on Windows</h2><ol class="list"><li>Download and run <b>Lastbook-1.1.14-Setup.exe</b>.</li><li>Follow the installer, then open Lastbook.</li><li>Choose your library size, state map and optional local AI in setup.</li></ol><p>If Windows blocks the installer, contact <a href="mailto:hello@lastbook.org">hello@lastbook.org</a> with the message you see.</p></section>
-<section class="card os-card dl-linux" id="linux-install" aria-labelledby="linux-h"><h2 id="linux-h">Install on Linux</h2><ol class="list"><li>Download the package for your Ubuntu: <a href="{DEB_2404}">Ubuntu 24.04</a> or <a href="{DEB_2604}">Ubuntu 26.04</a>. To check which you have, run <code>lsb_release -rs</code>.</li><li>In the folder containing it, run <code>sudo apt install ./Lastbook_1.1.14_amd64.deb</code> on Ubuntu 24.04, or <code>sudo apt install ./Lastbook_1.1.14_ubuntu26.04_amd64.deb</code> on Ubuntu 26.04.</li><li>Open Lastbook from your applications menu and choose your library, state map and optional local AI.</li></ol><p>Ubuntu 24.04 or 26.04 on Intel/AMD 64-bit computers. Setup downloads the content; Videos, Map and Chat work offline afterwards.</p></section>
+<section class="card os-card dl-win" id="windows" aria-labelledby="win-h"><h2 id="win-h">{WINDOWS} Install on Windows</h2><ol class="list"><li>Download and run <b>Lastbook-1.1.15-Setup.exe</b>.</li><li>Follow the installer, then open Lastbook.</li><li>Choose your library size, state map and optional local AI in setup.</li></ol><p>If Windows blocks the installer, contact <a href="mailto:hello@lastbook.org">hello@lastbook.org</a> with the message you see.</p></section>
+<section class="card os-card dl-linux" id="linux-install" aria-labelledby="linux-h"><h2 id="linux-h">Install on Linux</h2><ol class="list"><li>Download the package for your Ubuntu: <a href="{DEB_2404}">Ubuntu 24.04</a> or <a href="{DEB_2604}">Ubuntu 26.04</a>. To check which you have, run <code>lsb_release -rs</code>.</li><li>In the folder containing it, run <code>sudo apt install ./Lastbook_1.1.15_amd64.deb</code> on Ubuntu 24.04, or <code>sudo apt install ./Lastbook_1.1.15_ubuntu26.04_amd64.deb</code> on Ubuntu 26.04.</li><li>Open Lastbook from your applications menu and choose your library, state map and optional local AI.</li></ol><p>Ubuntu 24.04 or 26.04 on Intel/AMD 64-bit computers. Setup downloads the content; Videos, Map and Chat work offline afterwards.</p></section>
 </div>
-<section class="card plain" id="check"><h2>Check your download</h2><p>Mac 1.1.14 SHA-256</p><p><code style="overflow-wrap:anywhere">7510b0ff41e1800a4ffc348976359bdbc1ba5e50bbe52e007b4797bcdc01289f</code></p><p><a href="/SHA256SUMS.txt">All published checksums</a></p></section>
+<section class="card plain" id="check"><h2>Check your download</h2><p>Mac 1.1.15 SHA-256</p><p><code style="overflow-wrap:anywhere">d2a61ec7dd15dc8c433a10f41b21e4a23234c890255e65336fd710cbccb2ecab</code></p><p><a href="/SHA256SUMS.txt">All published checksums</a></p></section>
 </div></main>
 """ + FOOT
 

@@ -33,6 +33,8 @@ import traceback
 import urllib.parse
 from collections import deque
 
+import ui_language
+
 ORIGIN_WINDOWS = 'https://lastbook.invalid'
 ORIGIN_MAC = 'lastbook://app'
 
@@ -83,6 +85,7 @@ GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
 
 TOP_SCRIPT = r"""(() => {
   if (window.top !== window || window.origin === 'null') return;  // a saved page, in a frame or not, gets nothing
+  if (__UI_LANGUAGE__) window.LB_DESKTOP_LANGUAGE = true;
   // Asking for a location goes to the system's location service, which can ask the network. The map's button shows this message.
   const none = { getCurrentPosition(ok, no) { if (no) setTimeout(no, 0, { code: 1, message: 'Lastbook stays offline and does not ask where you are.' }) }, watchPosition() { return 0 }, clearWatch() { } };
   try { Object.defineProperty(Navigator.prototype, 'geolocation', { get() { return none }, configurable: false }) } catch { }
@@ -291,8 +294,23 @@ class _Sock:
         pass
 
 
-def _make_handler(base):
+def _make_handler(base, language_file):
     class BridgeHandler(base):
+        def do_GET(self):
+            if language_file is not None and self.path == ui_language.ROUTE:
+                return ui_language.handle(self, language_file)
+            return super().do_GET()
+
+        def do_HEAD(self):
+            if language_file is not None and self.path == ui_language.ROUTE:
+                return ui_language.handle(self, language_file)
+            return super().do_HEAD()
+
+        def do_POST(self):
+            if language_file is not None and self.path == ui_language.ROUTE:
+                return ui_language.handle(self, language_file)
+            return super().do_POST()
+
         def copyfile(self, source, outputfile):
             self.connection.ex.file_body(source)
 
@@ -647,14 +665,16 @@ class _PollSink(Sink):
 
 
 class Bridge:
-    def __init__(self, server_module, mode, origin, tmpdir=None, log=None, lanes=None, per_request=PER_REQUEST, piece=None, whole_max='default', poll_wait=POLL_WAIT):
+    def __init__(self, server_module, mode, origin, tmpdir=None, log=None, lanes=None, per_request=PER_REQUEST, piece=None,
+                 whole_max='default', poll_wait=POLL_WAIT, *, language_file=None):
         """server_module: the imported engine, after server.init(). mode: 'stream' or 'buffer'. origin: ORIGIN_MAC or ORIGIN_WINDOWS.
         tmpdir: where buffer mode spools (None: the system's). log: a function taking one dict per request; it never sees the key."""
         if mode not in ('stream', 'buffer'):
             raise ValueError(mode)
         self.server, self.mode, self.origin = server_module, mode, origin
         self.tmpdir, self.logger = tmpdir, log
-        self.Handler = _make_handler(server_module.Handler)
+        self.language_file = language_file
+        self.Handler = _make_handler(server_module.Handler, language_file)
         self.key = secrets.token_urlsafe(32)     # new each launch; never written to a log
         self.piece = piece or VIDEO_PIECE[mode]
         self.whole_max = WHOLE_MAX if whole_max == 'default' else whole_max
@@ -681,8 +701,8 @@ class Bridge:
         if refused:
             status, reason, hs, text = refused
             sink.head(status, reason, hs)
-            ack = lambda: None
-            sink.data(text, ack)
+            if method != 'HEAD':
+                sink.data(text, lambda: None)
             sink.finish(True)
             return None
         target, raw, lane = prepared
@@ -691,7 +711,8 @@ class Bridge:
             self.count('queue-full')
             status, reason, hs, text = _plain(503, 'Busy', b'too many requests')
             sink.head(status, reason, hs)
-            sink.data(text, lambda: None)
+            if method != 'HEAD':
+                sink.data(text, lambda: None)
             sink.finish(True)
             return None
         self.waiting_now.set()
@@ -701,7 +722,7 @@ class Bridge:
         """Buffer mode. done(Response) runs on a worker, or at once on this thread for a refusal. Returns the Exchange or None."""
         refused, prepared = self._prepare(method, url, headers, body, is_document)
         if refused:
-            done(Response(refused[0], refused[1], refused[2], body=refused[3]))
+            done(Response(refused[0], refused[1], refused[2], body=None if method == 'HEAD' else refused[3]))
             return None
         target, raw, lane = prepared
         if target.split('?', 1)[0].startswith('/__bridge/'):
@@ -711,7 +732,7 @@ class Bridge:
         if not lane.submit(ex):
             self.count('queue-full')
             status, reason, hs, text = _plain(503, 'Busy', b'too many requests')
-            done(Response(status, reason, hs, body=text))
+            done(Response(status, reason, hs, body=None if method == 'HEAD' else text))
             return None
         self.waiting_now.set()
         return ex
@@ -850,7 +871,8 @@ class Bridge:
     def top_script(self, polling=None):
         """Install in the top frame only where possible (macOS: forMainFrameOnly; WebView2 runs it in every frame, and it returns at once there)."""
         polling = self.mode == 'buffer' if polling is None else polling
-        return TOP_SCRIPT.replace('__KEY__', self.key).replace('__POLL__', 'true' if polling else 'false')
+        return (TOP_SCRIPT.replace('__KEY__', self.key).replace('__POLL__', 'true' if polling else 'false')
+                .replace('__UI_LANGUAGE__', 'true' if self.language_file is not None else 'false'))
 
     def target_of(self, url):
         if url == self.origin:
@@ -886,6 +908,12 @@ class Bridge:
         low = _lower(headers)
         path = target.split('?', 1)[0]
         origin = low.get('origin')
+        keyed = self.has_key(low)
+        # Ordinary API reads use the key for scheduling only. This route holds
+        # desktop state, so reads also require the top frame's key.
+        if self.language_file is not None and target == ui_language.ROUTE and method in ('GET', 'HEAD'):
+            if not keyed or (origin is not None and origin != self.origin):
+                return self._refusal('language-read', 403, 'Forbidden', url), None
         poll = path.startswith('/__bridge/')
         if poll and self.mode != 'buffer':
             return self._refusal('no-such-route', 404, 'Not Found', url), None
@@ -899,7 +927,7 @@ class Bridge:
                 return self._refusal('post-origin', 403, 'Forbidden', url), None
             if not ctype.startswith(wanted):
                 return self._refusal('post-type', 403, 'Forbidden', url), None
-            if not self.has_key(low):
+            if not keyed:
                 return self._refusal('post-key', 403, 'Forbidden', url), None
             if body is not None and len(body) > MAX_POST:
                 return self._refusal('post-size', 413, 'Too Large', url), None
@@ -917,7 +945,7 @@ class Bridge:
         if method == 'POST':
             lines.append(f'Content-Length: {len(body or b"")}')
         raw = ('\r\n'.join(lines) + '\r\n\r\n').encode('latin-1', 'replace') + (body or b'' if method == 'POST' else b'')
-        return None, (target, raw, self.lanes[_lane_for(method, path, self.has_key(low), target)])
+        return None, (target, raw, self.lanes[_lane_for(method, path, keyed, target)])
 
     def _engine_range(self, method, path, asked):
         """What the Handler gets as Range. A video answer holds at most one piece, and a video asked for with no Range gets the first."""

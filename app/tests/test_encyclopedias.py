@@ -392,6 +392,13 @@ class ChatTools(unittest.TestCase):
         self.assertEqual(summary.get('error'), 'unknown')
         self.assertIn('not in this library', text)
 
+    def test_a_citation_on_page_zero_is_rejected(self):
+        """PDF pages are 1-based. 0 is a value, not 'no page', and must not pass as a real citation."""
+        self.sess.add({'doc_id': 'fema-water', 'kind': 'pdf', 'page': 0, 'title': 'X'})
+        _, valid, invalid = assistant.validate_citations('A [S1]', self.sess)
+        self.assertEqual(valid, [])
+        self.assertEqual(invalid, ['S1'])
+
     def test_encyclopedia_hits_never_raises(self):
         with mock.patch.object(encyclopedias, 'search', side_effect=RuntimeError('no collection could be searched')):
             self.assertEqual(assistant.encyclopedia_hits('cholera'), [])

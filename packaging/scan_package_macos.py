@@ -29,7 +29,7 @@ SYSTEM = ('/usr/lib/', '/System/', '@rpath/', '@loader_path/', '@executable_path
 USER_PATH = re.compile(rb'/Users/[A-Za-z0-9._-]+')
 SHIP = json.loads((Path(__file__).resolve().with_name('ship_edits.json')).read_text(encoding='utf-8'))
 HOUSEHOLD = re.compile('|'.join(SHIP['forbidden']).encode(), re.I)
-FIRST_PARTY = re.compile(r'(^|/)(web|content)/|^(main|server|retrieval|assistant|llm_local|bridge|shell_macos|engine(\.\w+)?)$')
+FIRST_PARTY = re.compile(r'(^|/)(web|content)/|^(main|server|retrieval|assistant|llm_local|bridge|ui_language|shell_macos|engine(\.\w+)?)$')
 NETWORK = re.compile(r'^_(socket|connect|bind|listen|accept|getaddrinfo|gethostbyname|sendto|recvfrom)$|CFNetwork|CFSocket|CFStream|NSURLSession|NSURLConnection|NSStream|^_nw_')
 
 
@@ -115,9 +115,11 @@ def main():
                         problems.append(f'module not allowed: {rel}!{name}')
                     scan_bytes(f'{rel}!{name}', z.read(name))
     pkg = CArchiveReader(str(executable))
+    modules = set()
     for name, entry in pkg.toc.items():
         if entry[-1] == 'z':
             pyz = pkg.open_embedded_archive(name)
+            modules.update(pyz.toc)
             for mod in pyz.toc:
                 n_mods += 1
                 if bad_name(mod):
@@ -137,6 +139,8 @@ def main():
     roots = [a.app / 'Contents' / d / 'engine' / 'setup' / 'roots.pem' for d in ('Resources', 'Frameworks')]
     if not any(r.is_file() for r in roots):    # setup's downloader trusts only these roots; without them it downloads nothing
         problems.append('missing from the package: engine/setup/roots.pem')
+    if 'ui_language' not in modules:
+        problems.append('missing module from the package: ui_language')
     print(f'files {n_files}, native binaries {n_macho}, modules looked inside {n_mods}')
     print(f'remote_storage string: {remote_hits or "nowhere"} (the module itself is refused above)')
     print(f'/Users/... strings: { {u: w[:3] for u, w in user_paths.items()} or "none"}')

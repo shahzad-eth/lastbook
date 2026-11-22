@@ -17,6 +17,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # the build invokes this scanner with -I
+import i18n_catalogs  # noqa: E402
+
 BAD_SEGMENTS = {'test', 'tests', 'testing', 'pytest', 'unittest', 'doctest', 'remote_storage', 'webview', 'bottle', 'proxy_tools', 'onnxruntime',
                 'tokenizers', 'shell_windows', 'shell_macos', 'clr', 'clr_loader', 'pythonnet', 'lastbook_launcher', 'tkinter', 'PyInstaller',
                 'objc', 'AppKit', 'Foundation', 'PyObjCTools', 'vendor-macos', 'fixture', 'real_data_check', 'http_regression', 'cdp', 'f2py', 'pypdfium2_cli'}
@@ -71,6 +74,10 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         subprocess.run(['dpkg-deb', '-x', str(a.deb), str(root)], check=True)
+        try:
+            i18n_catalogs.check_assets(root / 'opt' / 'lastbook' / 'web', i18n_catalogs.generate())
+        except (OSError, ValueError) as error:
+            problems.append(f'localization: {error}')
         control = subprocess.run(['dpkg-deb', '-f', str(a.deb)], capture_output=True, text=True, check=True).stdout
         print(control.split('\nDescription')[0])
         packaged = {p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() or p.is_symlink()}
@@ -131,7 +138,7 @@ def main():
                 problems.append(f'path of a person\'s folder {u} in {where[:3]}')
         if 'opt/lastbook/engine/setup/roots.pem' not in packaged:
             problems.append('missing from the package: opt/lastbook/engine/setup/roots.pem')
-        for need in ('opt/lastbook/gst/libgstlastbooksrc.so', 'opt/lastbook/lastbook.py', 'opt/lastbook/app/main.py', 'opt/lastbook/app/shell_linux.py', 'opt/lastbook/web/index.html',
+        for need in ('opt/lastbook/gst/libgstlastbooksrc.so', 'opt/lastbook/lastbook.py', 'opt/lastbook/app/main.py', 'opt/lastbook/app/shell_linux.py', 'opt/lastbook/app/ui_language.py',
                      'opt/lastbook/setup/manifest-v1.json', 'opt/lastbook/VERSION', 'usr/bin/lastbook', 'usr/share/applications/lastbook.desktop'):
             if need not in packaged:
                 problems.append(f'missing from the package: {need}')

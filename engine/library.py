@@ -12,6 +12,11 @@ import argparse, collections, concurrent.futures, hashlib, html, http.server, im
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+if __package__:
+ from .saved_pages import caption_blocks
+else:  # direct execution: python3 engine/library.py build
+ from saved_pages import caption_blocks
+
 FROZEN=bool(getattr(sys,'frozen',False))
 ROOT=Path(os.environ['LASTBOOK_LIBRARY']).resolve() if os.environ.get('LASTBOOK_LIBRARY') else (Path(__file__).resolve().parents[1]/'library-data').resolve()
 VENDOR=ROOT/'tools'/('vendor-py312' if sys.version_info[:2]==(3,12) else 'vendor')
@@ -102,7 +107,7 @@ def catalog():
    winner.setdefault('also_in',[]).append(r['collection'])
    winner.setdefault('alternate_paths',[]).append(r['path'])
  records=sorted(unique.values(),key=lambda r:(r['category'],r['collection'],r['title']))
- (ROOT/'catalog.json').write_text(json.dumps(records,indent=2),encoding='utf-8')
+ atomic_write(ROOT/'catalog.json',json.dumps(records,indent=2))   # the app knows a library by this file: never half of it
  return records,bad
 
 def extract(r):
@@ -116,9 +121,27 @@ def extract(r):
    r.update(pages=len(pages),searchability='OCR text: verify against original page',ocr_path=ocr.relative_to(ROOT).as_posix())
    textpath.write_text('\n\f\n'.join(pages),encoding='utf-8');r['text_path']=textpath.relative_to(ROOT).as_posix()
    return r,pages,None
+ video=kind in ['video','mp4','webm','mkv']
+ if video:
+  try:
+   captions=[(c,(ROOT/c).read_bytes()) for c in r.get('captions',[])]
+  except Exception as e:
+   # A failed refresh must not remove usable cached pages from the rebuilt index.
+   try:
+    m=json.loads(meta.read_text(encoding='utf-8'))
+    if m.get('sha256')==r.get('sha256'):
+     pages=textpath.read_text(encoding='utf-8').split('\n\f\n')
+     if any(page.strip() for page in pages):
+      r.update(m.get('details',{}));r['text_path']=textpath.relative_to(ROOT).as_posix()
+      return r,pages,str(e)
+   except (OSError,ValueError,TypeError,AttributeError):pass  # missing or unreadable cache
+   return r,[],str(e)
+  # A video's checksum says nothing about its subtitles. Version 2 also retires caches made before the cue-boundary fixes.
+  caption_inputs={'version':2,'files':[[c,hashlib.sha256(data).hexdigest()] for c,data in captions],
+                  'fallback':[r['title'],r.get('notes','')]}
  if meta.exists() and textpath.exists():
   m=json.loads(meta.read_text(encoding='utf-8'))
-  if m.get('sha256')==r.get('sha256'):
+  if m.get('sha256')==r.get('sha256') and (not video or m.get('caption_inputs')==caption_inputs):
    text=textpath.read_text(encoding='utf-8');pages=text.split('\n\f\n');r.update(m.get('details',{}));r['text_path']=textpath.relative_to(ROOT).as_posix();return r,pages,None
  pages=[]
  try:
@@ -148,18 +171,19 @@ def extract(r):
     for n in sorted([n for n in z.namelist() if re.match(r'ppt/slides/slide\d+.xml$',n)],key=lambda n:int(re.search(r'slide(\d+)',n).group(1))):
      pages.append('\n'.join(e.text or '' for e in ET.fromstring(z.read(n)).iter() if e.tag.endswith('}t')))
    r['slides']=len(pages)
-  elif kind in ['video','mp4','webm','mkv']:
+  elif video:
    text=[]
-   for c in r.get('captions',[]):
-    lines=(ROOT/c).read_text(encoding='utf-8',errors='replace').splitlines()
-    for line in lines:
-     line=html.unescape(re.sub('<[^>]+>','',line)).strip()
-     if not line or '-->' in line or line.startswith(('WEBVTT','Kind:','Language:')) or line.isdigit():continue
-     if not text or text[-1]!=line:text.append(line)
+   for _,data in captions:
+    for _,lines in caption_blocks(data):
+     for line in lines:
+      line=html.unescape(re.sub('<[^>]+>','',line)).strip()
+      if line and (not text or text[-1]!=line):text.append(line)
    pages=['\n'.join(text)] if text else [r['title']+'\n'+r.get('notes','')]
   else:pages=[path.read_text(encoding='utf-8',errors='replace')]
   textpath.write_text('\n\f\n'.join(pages),encoding='utf-8')
-  meta.write_text(json.dumps({'sha256':r.get('sha256'),'details':{k:r[k] for k in ['pages','slides','searchability'] if k in r}}),encoding='utf-8')
+  cached={'sha256':r.get('sha256'),'details':{k:r[k] for k in ['pages','slides','searchability'] if k in r}}
+  if video:cached['caption_inputs']=caption_inputs
+  meta.write_text(json.dumps(cached),encoding='utf-8')
   r['text_path']=textpath.relative_to(ROOT).as_posix()
   return r,pages,None
  except Exception as e:return r,[],str(e)
@@ -179,9 +203,9 @@ def build():
    totalpages+=len(pages)
    if i%100==0:print(f'Indexed {i+1}/{len(records)} resources',flush=True)
  con.commit();con.close();building.replace(DB)
- (ROOT/'catalog.json').write_text(json.dumps(built,indent=2),encoding='utf-8')
+ atomic_write(ROOT/'catalog.json',json.dumps(built,indent=2))
  summary={'resources':len(built),'pdfs':sum(r['kind']=='pdf' for r in built),'pdf_pages':sum(r.get('pages') or 0 for r in built),'web_pages':sum(r['kind'] in ['html','htm'] for r in built),'videos':sum(r['kind'] in ['video','mp4','webm','mkv'] for r in built),'collections':sum(r['kind']=='zim' for r in built),'document_bytes':sum(r['bytes'] for r in built),'indexed_units':totalpages,'categories':dict(collections.Counter(r['category'] for r in built)),'extraction_errors':errors,'missing_files':bad,'image_only_pdfs':[r['path'] for r in built if (r.get('searchability') or '').startswith('image-only')]}
- (ROOT/'summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8');(ROOT/'reader.css').write_text(STYLE,encoding='utf-8')
+ atomic_write(ROOT/'summary.json',json.dumps(summary,indent=2));(ROOT/'reader.css').write_text(STYLE,encoding='utf-8')
  write_index(built,summary)
  print(json.dumps({k:v for k,v in summary.items() if k not in ['extraction_errors','missing_files','image_only_pdfs']},indent=2))
 
@@ -255,6 +279,13 @@ def atomic_write(path,text):
  tmp=path.with_name('.'+path.name+'.tmp');tmp.write_text(text,encoding='utf-8');os.replace(tmp,path)
 
 ZIMS={};ZIM_LOCK=threading.Lock()
+# Connections that may wait to be accepted. A page or the map asks for 20 or more files at once; with Python's default of 5,
+# macOS reset the rest. server.py serves with a subclass of this.
+LISTEN_QUEUE=128
+
+class HTTPServer(http.server.ThreadingHTTPServer):
+ request_queue_size=LISTEN_QUEUE
+
 class Handler(http.server.SimpleHTTPRequestHandler):
  timeout=30  # a client that sends half a request gives its thread back; do_GET allows longer for sending
  SEND_TIMEOUT=600  # a paused video stops reading for minutes at a time; the player asks again with a Range when it resumes
@@ -400,6 +431,6 @@ if __name__=='__main__':
    build()
  elif args.command=='search':print(json.dumps(search(args.query,args.limit),indent=2,ensure_ascii=False))
  else:
-  server=http.server.ThreadingHTTPServer(('127.0.0.1',args.port),Handler)
+  server=HTTPServer(('127.0.0.1',args.port),Handler)
   if os.environ.get('SURVIVAL_DISABLE_INDEX_WATCH')!='1':threading.Thread(target=watch_index,daemon=True).start()
   print(f'Offline library: http://127.0.0.1:{server.server_port}',flush=True);server.serve_forever()

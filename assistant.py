@@ -237,7 +237,9 @@ def source_known(s):
         r = S.catalog()['by_id'].get(s['doc_id']) if S is not None else None
         if not r:
             return False
-        if s.get('page') and r.get('pages') and not 1 <= s['page'] <= r['pages']:
+        page = s.get('page')
+        if page is not None and (not isinstance(page, int) or isinstance(page, bool) or page < 1
+                                 or (r.get('pages') and page > r['pages'])):
             return False
         return True
     return False

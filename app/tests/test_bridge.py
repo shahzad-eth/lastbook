@@ -4,9 +4,11 @@
   PYTHONDONTWRITEBYTECODE=1 <venv python> -B app/tests/test_bridge.py [-v]
 
 Uses the made-up library in derived/app-build/testdata (no model) and a stub for chat. Never packaged."""
-import faulthandler, hashlib, json, os, shutil, socket, statistics, subprocess, sys, threading, time, types, unittest
+import faulthandler, hashlib, json, os, shutil, socket, statistics, subprocess, sys, tempfile, threading, time, types, unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import mock
+from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 faulthandler.dump_traceback_later(600, exit=True)
@@ -209,6 +211,243 @@ class Both:
 
     def get(self, path, rng=None, **k):
         return call(self.b, 'GET', path, {'Range': rng} if rng else {}, **k)
+
+    def language_bridge(self, module=server, file=None):
+        if file is None:
+            tmp = TemporaryDirectory()
+            self.addCleanup(tmp.cleanup)
+            file = Path(tmp.name) / B.ui_language.FILENAME
+        bridge = B.Bridge(module, self.mode, OR[self.mode], language_file=file)
+        headers = {B.KEY_HEADER: bridge.key, 'Content-Type': 'application/json'}
+        return file, bridge, headers
+
+    def test_language_reads_and_writes_require_the_desktop_key(self):
+        file, b, key = self.language_bridge()
+        route, body = B.ui_language.ROUTE, b'{"language":"es-419"}'
+        self.assertEqual(call(b, 'POST', route, key, body).status, 200)
+        for method in ('GET', 'HEAD', 'POST'):
+            for headers in (None, {**key, B.KEY_HEADER: 'wrong'}, {**key, 'Origin': 'null'},
+                            {**key, 'Origin': 'https://other.invalid'}):
+                with self.subTest(method=method, headers=bool(headers)):
+                    r = call(b, method, route, headers, b'{"language":"en"}')
+                    self.assertEqual(r.status, 403)
+                    self.assertNotIn(b'es-419', r.body)
+                    if method == 'HEAD':
+                        self.assertEqual(r.body, b'')
+        r = call(b, 'GET', route, {**key, 'Origin': b.origin})
+        self.assertEqual(r.status, 200)
+        self.assertEqual(r.hs['cache-control'], 'no-store')
+        self.assertEqual(json.loads(r.body), {'language': 'es-419'})
+        self.assertEqual(call(b, 'HEAD', route, key).body, b'')
+        self.assertEqual(json.loads(file.read_bytes()), {'language': 'es-419'})
+        self.assertEqual(call(self.b, 'GET', route, self.key).status, 404)
+
+    def test_language_rejects_invalid_bodies_and_paths(self):
+        file, b, key = self.language_bridge()
+        route = B.ui_language.ROUTE
+        bad = (b'', b'null', b'[]', b'{', b'{}', b'{"language":null}', b'{"language":true}',
+               b'{"language":"en","language":"es-419"}', b'{"language":["en"]}', b'{"language":"es-ES"}',
+               b'{"language":"en","path":"../settings.json"}', b'{"language":"../settings.json"}',
+               b'{"language":"<img src=x>"}', b'{"language":"\xff"}', b' ' * 129)
+        for body in bad:
+            with self.subTest(body=body):
+                self.assertEqual(call(b, 'POST', route, key, body).status, 400)
+        self.assertEqual(call(b, 'POST', route, {**key, 'Content-Type': 'application/jsonp'}, b'{"language":"en"}').status, 400)
+        for target in (route + '/', route + '?path=../settings.json', '/api/%75i-language', '/ui/../ui-language.json', '/ui/%2e%2e/ui-language.json'):
+            with self.subTest(target=target):
+                self.assertEqual(call(b, 'POST', target, key, b'{"language":"en"}').status, 404)
+                self.assertEqual(call(b, 'GET', target).status, 404)
+        self.assertFalse(file.exists())
+
+    def test_language_file_survives_setup_library_and_new_bridge_keys(self):
+        file, setup, key = self.language_bridge(server.setup_api.SetupServer)
+        route = B.ui_language.ROUTE
+        settings = file.with_name('settings.json')
+        settings.write_bytes(b'{"library":"/path/to/library"}\n')
+        before = settings.read_bytes()
+        self.assertEqual(json.loads(call(setup, 'GET', route, key).body), {'language': None})
+        self.assertEqual(call(setup, 'POST', route, key, b'{"language":"es-419"}').status, 200)
+        for _ in range(2):  # a newly launched library bridge, including after a folder switch
+            _, library, new_key = self.language_bridge(file=file)
+            self.assertEqual(call(library, 'GET', route, key).status, 403)
+            self.assertEqual(json.loads(call(library, 'GET', route, new_key).body), {'language': 'es-419'})
+        self.assertEqual(settings.read_bytes(), before)
+
+    def test_language_file_recovers_from_corruption_and_failed_replace(self):
+        file, b, key = self.language_bridge()
+        route = B.ui_language.ROUTE
+        for data in (b'\xff', b'{"language":"es-ES"}', b'{"language":"es-419","language":"en"}', b' ' * 129):
+            file.write_bytes(data)
+            self.assertEqual(json.loads(call(b, 'GET', route, key).body), {'language': None})
+            self.assertEqual(file.read_bytes(), data)
+        self.assertEqual(call(b, 'POST', route, key, b'{"language":"es-419"}').status, 200)
+        with patch.object(B.ui_language.os, 'replace', side_effect=PermissionError('cannot replace')):
+            r = call(b, 'POST', route, key, b'{"language":"en"}')
+        self.assertEqual(r.status, 500)
+        self.assertEqual(json.loads(call(b, 'GET', route, key).body), {'language': 'es-419'})
+        self.assertEqual(list(file.parent.iterdir()), [file])
+
+    def test_language_concurrent_windows_commit_in_replacement_order(self):
+        file, first, first_key = self.language_bridge()
+        _, second, second_key = self.language_bridge(file=file)
+        route = B.ui_language.ROUTE
+        replace = os.replace
+        arrived, release = threading.Event(), threading.Event()
+        replies = []
+
+        def replace_language(src, dst):
+            if Path(dst) == file and json.loads(Path(src).read_bytes()) == {'language': 'es-419'}:
+                arrived.set()
+                if not release.wait(5):
+                    raise TimeoutError('test did not release the first write')
+            replace(src, dst)
+
+        def first_save():
+            replies.append(call(first, 'POST', route, first_key, b'{"language":"es-419"}').status)
+
+        with patch.object(B.ui_language.os, 'replace', side_effect=replace_language):
+            worker = threading.Thread(target=first_save)
+            worker.start()
+            try:
+                self.assertTrue(arrived.wait(5))
+                self.assertEqual(call(second, 'POST', route, second_key, b'{"language":"en"}').status, 200)
+                self.assertEqual(json.loads(call(first, 'GET', route, first_key).body), {'language': 'en'})
+            finally:
+                release.set()
+                worker.join(6)
+        self.assertEqual(replies, [200])
+        self.assertEqual(json.loads(call(second, 'GET', route, second_key).body), {'language': 'es-419'})
+        self.assertEqual(list(file.parent.iterdir()), [file])
+
+    def test_language_interrupted_write_and_nonregular_objects(self):
+        file, b, key = self.language_bridge()
+        route = B.ui_language.ROUTE
+        file.mkdir()
+        self.assertEqual(json.loads(call(b, 'GET', route, key).body), {'language': None})
+        self.assertEqual(call(b, 'POST', route, key, b'{"language":"en"}').status, 500)
+        self.assertEqual(list(file.parent.iterdir()), [file])
+        file.rmdir()
+        if hasattr(os, 'mkfifo'):
+            os.mkfifo(file)
+            self.assertEqual(json.loads(call(b, 'GET', route, key, timeout=3).body), {'language': None})
+            file.unlink()
+        saved = b'{"language":"es-419"}'
+        file.write_bytes(saved)
+        orphan = file.with_name('.ui-language-interrupted')
+        orphan.write_bytes(b'{"language":')
+        self.assertEqual(json.loads(call(b, 'GET', route, key).body), {'language': 'es-419'})
+        with patch.object(B.ui_language.os, 'fsync', side_effect=OSError('interrupted write')):
+            self.assertEqual(call(b, 'POST', route, key, b'{"language":"en"}').status, 500)
+        self.assertEqual(file.read_bytes(), saved)
+        self.assertEqual(set(file.parent.iterdir()), {file, orphan})
+
+    @unittest.skipUnless(os.name == 'posix', 'symlink test uses POSIX file semantics')
+    def test_language_symlink_cannot_read_or_overwrite_another_file(self):
+        file, b, key = self.language_bridge()
+        other = file.with_name('settings.json')
+        other.write_bytes(b'{"language":"es-419"}')
+        file.symlink_to(other)
+        route = B.ui_language.ROUTE
+        self.assertEqual(json.loads(call(b, 'GET', route, key).body), {'language': None})
+        self.assertEqual(call(b, 'POST', route, key, b'{"language":"en"}').status, 200)
+        self.assertFalse(file.is_symlink())
+        self.assertEqual(other.read_bytes(), b'{"language":"es-419"}')
+        self.assertEqual(json.loads(call(b, 'GET', route, key).body), {'language': 'en'})
+
+    def test_language_save_retries_a_replace_another_process_is_holding(self):
+        file, b, key = self.language_bridge()
+        route = B.ui_language.ROUTE
+        real = os.replace
+        refusals = [PermissionError('in use'), PermissionError('in use')]
+
+        def replace_when_free(src, dst):
+            if refusals:
+                raise refusals.pop()
+            real(src, dst)
+
+        with patch.object(B.ui_language.os, 'replace', side_effect=replace_when_free) as replace, \
+                patch.object(B.ui_language, 'REPLACE_WAIT', 0):
+            r = call(b, 'POST', route, key, b'{"language":"es-419"}')
+        self.assertEqual(r.status, 200)
+        self.assertEqual(replace.call_count, 3)
+        self.assertEqual(json.loads(file.read_bytes()), {'language': 'es-419'})
+        self.assertEqual(list(file.parent.iterdir()), [file])
+        # A refusal that never clears still ends in a clean 500 after a bounded number of tries.
+        with patch.object(B.ui_language.os, 'replace', side_effect=PermissionError('in use')) as replace, \
+                patch.object(B.ui_language, 'REPLACE_WAIT', 0):
+            r = call(b, 'POST', route, key, b'{"language":"en"}')
+        self.assertEqual(r.status, 500)
+        self.assertEqual(replace.call_count, B.ui_language.REPLACE_TRIES)
+        self.assertEqual(json.loads(file.read_bytes()), {'language': 'es-419'})
+        self.assertEqual(list(file.parent.iterdir()), [file])
+        # Only a permission refusal is retried.
+        with patch.object(B.ui_language.os, 'replace', side_effect=OSError('disk')) as replace:
+            self.assertEqual(call(b, 'POST', route, key, b'{"language":"en"}').status, 500)
+        self.assertEqual(replace.call_count, 1)
+
+    @unittest.skipUnless(hasattr(os, 'O_DIRECTORY'), 'folder sync is POSIX only')
+    def test_language_save_syncs_the_folder_but_never_fails_on_it(self):
+        file, b, key = self.language_bridge()
+        route = B.ui_language.ROUTE
+        synced = []
+        real = os.fsync
+
+        def fsync(fd):
+            synced.append(stat_is_dir(fd))
+            return real(fd)
+
+        def stat_is_dir(fd):
+            import stat as stat_module
+            return stat_module.S_ISDIR(os.fstat(fd).st_mode)
+
+        with patch.object(B.ui_language.os, 'fsync', side_effect=fsync):
+            self.assertEqual(call(b, 'POST', route, key, b'{"language":"es-419"}').status, 200)
+        self.assertEqual(synced, [False, True])  # the new file's data, then the folder entry
+
+        def fsync_folder_fails(fd):
+            if stat_is_dir(fd):
+                raise OSError('not supported here')
+            return real(fd)
+
+        with patch.object(B.ui_language.os, 'fsync', side_effect=fsync_folder_fails):
+            self.assertEqual(call(b, 'POST', route, key, b'{"language":"en"}').status, 200)
+        self.assertEqual(json.loads(file.read_bytes()), {'language': 'en'})
+        real_open = os.open
+        refused = []
+
+        def open_without_folders(path, flags, *args, **kwargs):
+            if flags & os.O_DIRECTORY:
+                refused.append(path)
+                raise OSError('no folder handle')
+            return real_open(path, flags, *args, **kwargs)
+
+        with patch.object(B.ui_language.os, 'open', side_effect=open_without_folders):
+            self.assertEqual(call(b, 'POST', route, key, b'{"language":"es-419"}').status, 200)
+        self.assertTrue(refused)
+        self.assertEqual(json.loads(file.read_bytes()), {'language': 'es-419'})
+
+    def test_language_symlink_swapped_in_after_the_check_reads_as_unset(self):
+        import errno
+        file, b, key = self.language_bridge()
+        route = B.ui_language.ROUTE
+        file.write_bytes(b'{"language":"es-419"}')
+        # O_NOFOLLOW reports a link that replaced the file between lstat and open as ELOOP.
+        real_open = os.open
+
+        def fail_for_the_file(error):
+            def opener(path, flags, *args, **kwargs):
+                if Path(path) == file:
+                    raise error
+                return real_open(path, flags, *args, **kwargs)
+            return opener
+
+        with patch.object(B.ui_language.os, 'open', side_effect=fail_for_the_file(OSError(errno.ELOOP, 'too many links'))):
+            r = call(b, 'GET', route, key)
+        self.assertEqual(r.status, 200)
+        self.assertEqual(json.loads(r.body), {'language': None})
+        # Other open failures are still errors the person can see.
+        with patch.object(B.ui_language.os, 'open', side_effect=fail_for_the_file(PermissionError(errno.EACCES, 'denied'))):
+            self.assertEqual(call(b, 'GET', route, key).status, 500)
 
     # ---- Range forms on video
     def check_slice(self, r, start, end, size=A_SIZE):
@@ -830,6 +1069,54 @@ class AssistantHTTPMessages(unittest.TestCase):
         body = self.round(messages)
         self.assertEqual(body['messages'], messages)
         self.assertNotIn('tools', body)
+
+
+class ServerMode(unittest.TestCase):
+    """server.py run on its own (--lan, the library server): the map asks for 20 or more tiles at once."""
+
+    def listen_queue(self, server_class, handler):
+        srv = server_class(('127.0.0.1', 0), handler, bind_and_activate=False)
+        try:
+            with mock.patch.object(socket.socket, 'listen') as listen:   # never really listens: WholeProcess checks that
+                srv.server_bind()
+                srv.server_activate()
+            return listen.call_args.args[0]
+        finally:
+            srv.server_close()
+
+    def test_listen_queue_holds_a_burst_of_tiles(self):
+        # Python's default queue is 5: on macOS the waiting connections beyond it were reset, and those tiles stayed blank.
+        self.assertGreaterEqual(self.listen_queue(server.HTTPServer, server.Handler), 64)
+
+    def test_library_server_has_the_same_queue(self):
+        # engine/library.py serve: the plain library server, without server.py on top.
+        library = server.library
+        self.assertGreaterEqual(self.listen_queue(library.HTTPServer, library.Handler), 64)
+
+
+class CatalogWrite(unittest.TestCase):
+    """engine/library.py writes catalog.json when it builds; the app recognises a library by that file (app/main.py check)."""
+
+    def test_cut_short_keeps_the_old_catalog(self):
+        library = server.library
+        root = Path(tempfile.mkdtemp(prefix='lastbook-catalog-'))
+        self.addCleanup(shutil.rmtree, root)
+        (root / 'manifests').mkdir()
+        (root / 'docs').mkdir()
+        (root / 'docs' / 'a.pdf').write_bytes(b'%PDF-1.4')
+        (root / 'manifests' / 'docs.json').write_text(json.dumps([{'path': 'docs/a.pdf', 'title': 'A'}]), encoding='utf-8')
+        old = '[{"path": "docs/a.pdf", "title": "A"}]'
+        (root / 'catalog.json').write_text(old, encoding='utf-8')
+        real_write = Path.write_text
+
+        def half_then_fail(path, text, *args, **kwargs):   # a full disk, or the build stopped mid-write
+            real_write(path, text[:len(text) // 2], *args, **kwargs)
+            raise OSError('No space left on device')
+
+        with mock.patch.object(library, 'ROOT', root), mock.patch.object(Path, 'write_text', half_then_fail):
+            with self.assertRaises(OSError):
+                library.catalog()
+        self.assertEqual((root / 'catalog.json').read_text(encoding='utf-8'), old)
 
 
 class NothingGoesOut(unittest.TestCase):

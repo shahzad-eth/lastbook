@@ -224,7 +224,7 @@
    "id": "breathing",
    "label": "Not breathing, unconscious or choking",
    "hint": "Collapsed or fainted, not responding, heart stopped (cardiac arrest), AED or defibrillator, can't breathe, gasping, food stuck in throat, drowning",
-   "urgent": ["not breathing", "stopped breathing", "isn't breathing", "isnt breathing", "unconscious"],
+   "urgent": ["not breathing", "stopped breathing", "isn't breathing", "isnt breathing", "unconscious", "cardiac arrest", "heart stopped", "heart has stopped"],
    "read": [
     {
      "doc": "med-2e83e22162a9a006",

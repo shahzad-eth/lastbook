@@ -17,6 +17,7 @@ import tempfile
 import threading
 import time
 import traceback
+from contextlib import suppress
 from pathlib import Path
 
 FROZEN = bool(getattr(sys, 'frozen', False))
@@ -55,10 +56,18 @@ def remembered():
 
 def remember(folder):
     settings = app_folders()[0] / 'settings.json'
+    tmp = None
     try:
         settings.parent.mkdir(parents=True, exist_ok=True)
-        settings.write_text(json.dumps({'library': str(folder)}), encoding='utf-8')
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=settings.parent,
+                                         prefix=settings.name + '.', suffix='.tmp', delete=False) as out:
+            tmp = Path(out.name)
+            json.dump({'library': str(folder)}, out)
+        os.replace(tmp, settings)   # a write cut short leaves the old choice, never half a file
     except OSError as e:   # it still opens this time; it asks again next time
+        if tmp is not None:
+            with suppress(OSError):
+                tmp.unlink(missing_ok=True)
         print('could not remember the library:', e, flush=True)
 
 
@@ -253,6 +262,11 @@ def setup_options():
             'pick_folder': pick_folder, 'look_for_libraries': libraries_here}
 
 
+def language_file():
+    from ui_language import FILENAME
+    return app_folders()[0] / FILENAME
+
+
 def run_setup():
     """No library yet: the window opens on setup instead. Nothing here reaches the network until the person starts a download."""
     from engine.setup import api as setup_api
@@ -263,7 +277,7 @@ def run_setup():
     setup_api.configure(mode='first-run', **setup_options())
     if sys.platform == 'darwin':
         import shell_macos
-        shell_macos.run(B.Bridge(setup_api.SetupServer, 'stream', B.ORIGIN_MAC))
+        shell_macos.run(B.Bridge(setup_api.SetupServer, 'stream', B.ORIGIN_MAC, language_file=language_file()))
         return 0
     if sys.platform == 'win32':
         import ctypes
@@ -273,10 +287,10 @@ def run_setup():
         if problem:
             show_error(problem)
             return 3
-        return shell_windows.run(setup_api.SetupServer, work)
+        return shell_windows.run(setup_api.SetupServer, work, language_file=language_file())
     if sys.platform.startswith('linux'):
         import shell_linux
-        shell_linux.run(B.Bridge(setup_api.SetupServer, 'stream', B.ORIGIN_MAC), linux_dirs())
+        shell_linux.run(B.Bridge(setup_api.SetupServer, 'stream', B.ORIGIN_MAC, language_file=language_file()), linux_dirs())
         return 0
     show_error('The Lastbook desktop app runs on Windows and macOS. Everywhere else, use the server version: python server.py')
     return 2
@@ -395,13 +409,13 @@ def main():
     import bridge as B
     if sys.platform == 'darwin':
         import shell_macos
-        shell_macos.run(B.Bridge(server, 'stream', B.ORIGIN_MAC))
+        shell_macos.run(B.Bridge(server, 'stream', B.ORIGIN_MAC, language_file=language_file()))
     elif sys.platform == 'win32':
         import shell_windows
-        return shell_windows.run(server, data)
+        return shell_windows.run(server, data, language_file=language_file())
     elif sys.platform.startswith('linux'):
         import shell_linux
-        shell_linux.run(B.Bridge(server, 'stream', B.ORIGIN_MAC), linux_dirs())
+        shell_linux.run(B.Bridge(server, 'stream', B.ORIGIN_MAC, language_file=language_file()), linux_dirs())
     else:
         show_error('The Lastbook desktop app runs on Windows and macOS. Everywhere else, use the server version: python server.py')
         return 2

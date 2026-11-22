@@ -1,0 +1,1293 @@
+{
+ "about": "Proposed region definitions for detailed maps of Brazil: 26 states and the Federal District, one region each. See docs/REGIONS-BR.md.",
+ "status": "proposal",
+ "checked": "2026-11-20",
+ "codes": {
+  "proposal": "ISO 3166-2:BR unit codes: the prefix BR- and two letters, BR-AC to BR-TO.",
+  "why": "Seven two-letter codes (AL, MA, MS, MT, PA, PR, SC) are also codes in STATE_CODES (engine/address_search.py) for US states or Puerto Rico. carry_over() in engine/setup/install.py keeps only [A-Z]{2} address indexes (line 335), so the hyphenated name must be decided before any index is shipped.",
+  "verified": "The 27 codes were read from the Wikipedia article 'ISO 3166-2:BR' (opened 2026-11-20), which lists the names as in ISO 3166-2 from the ISO 3166/MA. The ISO Online Browsing Platform itself was not opened."
+ },
+ "boxes": {
+  "source": "IBGE state polygons (malhas territoriais, estadual), read through the IBGE malhas API with qualidade=maxima on 2026-11-20.",
+  "method": "Every vertex of every polygon was read; the box was widened by 0.15 degrees and rounded outward to 0.01 degrees (floor for west and south, ceiling for east and north), the same margin map_sets.state uses for US states.",
+  "islands": "Detached polygons were checked for all 27 units (any polygon more than 0.5 degrees from the largest one). Two are in the IBGE polygons: Fernando de Noronha (BR-PE, kept) and Trindade and Martim Vaz (BR-ES, left out of the box). Atol das Rocas (RN) and São Pedro e São Paulo (PE) are not in the IBGE polygons.",
+  "licence_status": "Not settled. No explicit open licence was found for the IBGE malhas; the IBGE technical and legal note was not read. Boxes are a proposal until that is checked."
+ },
+ "layer_keys": {
+  "terrain": "terrain.sqlite",
+  "water": "water.sqlite",
+  "dams": "water.sqlite (nid part today)",
+  "crops": "crops.sqlite",
+  "buildings": "buildings.sqlite",
+  "places": "places.sqlite",
+  "addresses": "derived/geo/addresses/<code>.sqlite",
+  "pois": "poi rows in national.sqlite"
+ },
+ "licences": {
+  "CC-BY-ND-3.0-BR": {
+   "name": "Creative Commons Atribuição-SemDerivações 3.0 Não Adaptada (CC BY-ND 3.0 Brazil)",
+   "share_alike": false,
+   "derivatives_allowed": false,
+   "verified": "opened 2026-11-20: gov.br 'Sobre o portal' page and the federal SAMU 192 article (footer text)."
+  },
+  "IBGE-unclear": {
+   "name": "No explicit open licence found for IBGE malhas",
+   "share_alike": null,
+   "verified": "not settled: the IBGE 'Informações técnicas e legais' note was seen in search only, not opened; the BC250 term describes restricted use (search only)."
+  },
+  "ODbL-1.0": {
+   "name": "Open Database License 1.0",
+   "url": "https://opendatacommons.org/licenses/odbl/1-0/",
+   "attribution": "© OpenStreetMap contributors",
+   "share_alike": true,
+   "verified": "opened 2026-11-20 (opendatacommons.org/licenses/odbl/1-0/): commercial use allowed; derivative databases allowed with share-alike."
+  },
+  "CC-BY-4.0": {
+   "name": "Creative Commons Attribution 4.0 International",
+   "url": "https://creativecommons.org/licenses/by/4.0/",
+   "share_alike": false,
+   "verified": "opened 2026-11-20 (creativecommons.org/licenses/by/4.0/): adapt, including commercially, with attribution."
+  },
+  "CNES-cc-by": {
+   "name": "cc-by, from the CNES dataset licence field",
+   "verified": "opened 2026-11-20 (dadosabertos.saude.gov.br dataset page)."
+  },
+  "ANA-free-access": {
+   "name": "'O acesso ao dado é livre' (no named licence)",
+   "verified": "opened 2026-11-20 (metadados.snirh.gov.br BHO 6 record). Not an explicit licence: fails the test."
+  },
+  "SIAGAS-no-licence": {
+   "name": "no licence text found",
+   "verified": "siagasweb.sgb.gov.br opened 2026-11-20: no licence or terms text. Fails the test."
+  }
+ },
+ "country_layers": {
+  "terrain": [
+   {
+    "dataset": "Copernicus DEM GLO-30 (as in REGIONS-AR.md and REGIONS-MX.md)",
+    "publisher": "ESA / Airbus",
+    "licence": "Copernicus licence",
+    "verified": "not checked for Brazil",
+    "role": "fallback",
+    "notes": "No Brazil-specific national elevation product was checked in this pass."
+   }
+  ],
+  "water": [
+   {
+    "dataset": "OSM waterways and water areas (Brazil)",
+    "publisher": "OSM contributors",
+    "licence": "ODbL-1.0",
+    "verified": "ODbL read 2026-11-20; OSM data not sampled for water features here",
+    "role": "primary",
+    "notes": "IBGE hydrography not checked; ANA BHO 6 not proposed (see water.not_proposed)."
+   }
+  ],
+  "dams": [
+   {
+    "dataset": "No open national dam list identified",
+    "publisher": "not identified",
+    "licence": null,
+    "verified": "not checked",
+    "role": "open question",
+    "notes": "OSM waterway=dam as fallback, not counted."
+   }
+  ],
+  "crops": [
+   {
+    "dataset": "MapBiomas land cover (candidate)",
+    "publisher": "MapBiomas",
+    "licence": null,
+    "verified": "not checked",
+    "role": "candidate",
+    "notes": "Licence and class list not checked; would need a class mapping to crops.sqlite."
+   }
+  ],
+  "buildings": [
+   {
+    "dataset": "Google Open Buildings V3 (as in REGIONS-MX.md)",
+    "publisher": "Google Research",
+    "licence": "CC-BY-4.0",
+    "verified": "as REGIONS-MX.md; Brazil coverage not re-checked here",
+    "role": "primary candidate",
+    "notes": "OSM heights and gaps as for the US."
+   }
+  ],
+  "places": [
+   {
+    "dataset": "IBGE malhas, state layer (used for the boxes); municipality and locality layers",
+    "publisher": "IBGE",
+    "licence": "IBGE-unclear",
+    "verified": "state layer opened 2026-11-20; licence not settled",
+    "role": "primary candidate",
+    "notes": "Municipality and locality layers not opened for this proposal."
+   },
+   {
+    "dataset": "OSM named places",
+    "publisher": "OSM contributors",
+    "licence": "ODbL-1.0",
+    "verified": "not checked for Brazil",
+    "role": "fallback",
+    "notes": ""
+   }
+  ],
+  "addresses": [
+   {
+    "dataset": "Overture addresses (Brazil)",
+    "publisher": "Overture Maps Foundation",
+    "licence": null,
+    "verified": "count opened 2026-11-20 (guide per-country table); attribution page not re-read",
+    "role": "candidate",
+    "notes": "89,887,635 Brazilian rows (publisher's count). Per-state counts not computed."
+   }
+  ],
+  "pois": [
+   {
+    "dataset": "OSM amenity, emergency and water tags (counts in osm_counts)",
+    "publisher": "OSM contributors",
+    "licence": "ODbL-1.0",
+    "verified": "counts read through Overpass 2026-11-20",
+    "role": "primary",
+    "notes": ""
+   },
+   {
+    "dataset": "CNES health establishments",
+    "publisher": "Ministério da Saúde (DATASUS)",
+    "licence": "CNES-cc-by",
+    "verified": "dataset page opened 2026-11-20; coordinates not verified",
+    "role": "candidate",
+    "notes": "See help_points.cnes_health_establishments."
+   }
+  ]
+ },
+ "not_open_nationwide": [
+  "Postcode areas: Brazil has no open CEP area layer that was checked. The CEP is eight digits; no CEP-to-state table was checked.",
+  "Dam inventory: no open national list was identified in this pass.",
+  "Health establishments with coordinates (CNES) and state fire and police station lists were not checked."
+ ],
+ "addressing": {
+  "postal_code": {
+   "format": "Eight digits (CEP, Código de Endereçamento Postal), written 00000-000 with a hyphen after the fifth digit, for example 01311-000 (the Correios example). The Correios API accepts eight digits without the hyphen. Keep as text: leading zeros occur.",
+   "verified": "Correios Guia Técnico de Endereçamento de Correspondências (v1.4, 2021): search snippet only, PDF not opened.",
+   "not_a_state_code": "The first digit of a CEP is a broad region, not a state. No CEP-to-state table was checked, so address indexes cannot be split by state yet."
+  },
+  "order": "Street type, street name, number, then complement and neighbourhood, then city and state (UF), with the CEP last (Correios guide; search snippet only).",
+  "no_number": "Correios writes SN (sem número) for no number; the CEP complement is then 00000 (search snippet only).",
+  "code_now": "tools/build_addresses.py keeps only country = 'US'. engine/address_search.py normalize() replaces every character outside a-z and 0-9 with a space, so Portuguese accents split words (for example 'Ação' becomes 'a o'). is_address_query() needs a number first.",
+  "overture_brazil_count": {
+   "value": 89887635,
+   "source": "Overture addresses guide, per-country table",
+   "verified": "opened 2026-11-20",
+   "note": "Publisher's count, not made for this proposal."
+  }
+ },
+ "regions": [
+  {
+   "code": "BR-RO",
+   "ibge": "11",
+   "name": "Rondônia",
+   "name_en": "Rondonia",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -66.8103,
+    "south": -13.6937,
+    "east": -59.7744,
+    "north": -7.9759,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -66.97,
+    -13.85,
+    -59.62,
+    -7.82
+   ]
+  },
+  {
+   "code": "BR-AC",
+   "ibge": "12",
+   "name": "Acre",
+   "name_en": "Acre",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -73.9904,
+    "south": -11.1456,
+    "east": -66.6239,
+    "north": -7.1118,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -74.15,
+    -11.3,
+    -66.47,
+    -6.96
+   ]
+  },
+  {
+   "code": "BR-AM",
+   "ibge": "13",
+   "name": "Amazonas",
+   "name_en": "Amazonas",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -73.8016,
+    "south": -9.818,
+    "east": -56.0976,
+    "north": 2.2466,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -73.96,
+    -9.97,
+    -55.94,
+    2.4
+   ]
+  },
+  {
+   "code": "BR-RR",
+   "ibge": "14",
+   "name": "Roraima",
+   "name_en": "Roraima",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -64.8253,
+    "south": -1.5806,
+    "east": -58.8869,
+    "north": 5.2718,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -64.98,
+    -1.74,
+    -58.73,
+    5.43
+   ]
+  },
+  {
+   "code": "BR-PA",
+   "ibge": "15",
+   "name": "Pará",
+   "name_en": "Para",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -58.8983,
+    "south": -9.8412,
+    "east": -46.0618,
+    "north": 2.591,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -59.05,
+    -10.0,
+    -45.91,
+    2.75
+   ],
+   "notes": "Pará has 17 polygons; the box is the union of all of them."
+  },
+  {
+   "code": "BR-AP",
+   "ibge": "16",
+   "name": "Amapá",
+   "name_en": "Amapa",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -54.8763,
+    "south": -1.2362,
+    "east": -49.8758,
+    "north": 4.5088,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -55.03,
+    -1.39,
+    -49.72,
+    4.66
+   ]
+  },
+  {
+   "code": "BR-TO",
+   "ibge": "17",
+   "name": "Tocantins",
+   "name_en": "Tocantins",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -50.7421,
+    "south": -13.4682,
+    "east": -45.6993,
+    "north": -5.1684,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -50.9,
+    -13.62,
+    -45.54,
+    -5.01
+   ]
+  },
+  {
+   "code": "BR-MA",
+   "ibge": "21",
+   "name": "Maranhão",
+   "name_en": "Maranhao",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -48.7552,
+    "south": -10.2596,
+    "east": -41.7967,
+    "north": -1.0495,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -48.91,
+    -10.41,
+    -41.64,
+    -0.89
+   ]
+  },
+  {
+   "code": "BR-PI",
+   "ibge": "22",
+   "name": "Piauí",
+   "name_en": "Piaui",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -46.0282,
+    "south": -10.9288,
+    "east": -40.3705,
+    "north": -2.7499,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -46.18,
+    -11.08,
+    -40.22,
+    -2.59
+   ]
+  },
+  {
+   "code": "BR-CE",
+   "ibge": "23",
+   "name": "Ceará",
+   "name_en": "Ceara",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -41.4233,
+    "south": -7.8576,
+    "east": -37.2527,
+    "north": -2.7843,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -41.58,
+    -8.01,
+    -37.1,
+    -2.63
+   ]
+  },
+  {
+   "code": "BR-RN",
+   "ibge": "24",
+   "name": "Rio Grande do Norte",
+   "name_en": "Rio Grande do Norte",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -38.5821,
+    "south": -6.9827,
+    "east": -34.9685,
+    "north": -4.8314,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -38.74,
+    -7.14,
+    -34.81,
+    -4.68
+   ]
+  },
+  {
+   "code": "BR-PB",
+   "ibge": "25",
+   "name": "Paraíba",
+   "name_en": "Paraiba",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -38.7652,
+    "south": -8.303,
+    "east": -34.7932,
+    "north": -6.0259,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -38.92,
+    -8.46,
+    -34.64,
+    -5.87
+   ]
+  },
+  {
+   "code": "BR-PE",
+   "ibge": "26",
+   "name": "Pernambuco",
+   "name_en": "Pernambuco",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -41.3583,
+    "south": -9.4829,
+    "east": -32.3971,
+    "north": -3.8358,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -41.51,
+    -9.64,
+    -32.24,
+    -3.68
+   ],
+   "notes": "Fernando de Noronha (about 2.4 degrees east of the mainland) is kept; its tight edge is -32.397 W. Without it the box ends at -34.807 W."
+  },
+  {
+   "code": "BR-AL",
+   "ibge": "27",
+   "name": "Alagoas",
+   "name_en": "Alagoas",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -38.2376,
+    "south": -10.4986,
+    "east": -35.1527,
+    "north": -8.8161,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -38.39,
+    -10.65,
+    -35.0,
+    -8.66
+   ]
+  },
+  {
+   "code": "BR-SE",
+   "ibge": "28",
+   "name": "Sergipe",
+   "name_en": "Sergipe",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -38.245,
+    "south": -11.5685,
+    "east": -36.3959,
+    "north": -9.515,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -38.4,
+    -11.72,
+    -36.24,
+    -9.36
+   ]
+  },
+  {
+   "code": "BR-BA",
+   "ibge": "29",
+   "name": "Bahia",
+   "name_en": "Bahia",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -46.5768,
+    "south": -18.3372,
+    "east": -37.3411,
+    "north": -8.5328,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -46.73,
+    -18.49,
+    -37.19,
+    -8.38
+   ]
+  },
+  {
+   "code": "BR-MG",
+   "ibge": "31",
+   "name": "Minas Gerais",
+   "name_en": "Minas Gerais",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -51.0461,
+    "south": -22.9228,
+    "east": -39.8568,
+    "north": -14.2333,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -51.2,
+    -23.08,
+    -39.7,
+    -14.08
+   ]
+  },
+  {
+   "code": "BR-ES",
+   "ibge": "32",
+   "name": "Espírito Santo",
+   "name_en": "Espirito Santo",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -41.8796,
+    "south": -21.3011,
+    "east": -39.6678,
+    "north": -17.8919,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -42.03,
+    -21.46,
+    -39.51,
+    -17.74
+   ],
+   "notes": "Trindade and Martim Vaz (about 10 degrees east, around 20.5 S) are left out of the box; see the open questions."
+  },
+  {
+   "code": "BR-RJ",
+   "ibge": "33",
+   "name": "Rio de Janeiro",
+   "name_en": "Rio de Janeiro",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -44.8893,
+    "south": -23.3676,
+    "east": -40.9579,
+    "north": -20.7632,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -45.04,
+    -23.52,
+    -40.8,
+    -20.61
+   ]
+  },
+  {
+   "code": "BR-SP",
+   "ibge": "35",
+   "name": "São Paulo",
+   "name_en": "Sao Paulo",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -53.1101,
+    "south": -25.3089,
+    "east": -44.1614,
+    "north": -19.7799,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -53.27,
+    -25.46,
+    -44.01,
+    -19.62
+   ]
+  },
+  {
+   "code": "BR-PR",
+   "ibge": "41",
+   "name": "Paraná",
+   "name_en": "Parana",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -54.6199,
+    "south": -26.7171,
+    "east": -48.0235,
+    "north": -22.5163,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -54.77,
+    -26.87,
+    -47.87,
+    -22.36
+   ]
+  },
+  {
+   "code": "BR-SC",
+   "ibge": "42",
+   "name": "Santa Catarina",
+   "name_en": "Santa Catarina",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -53.8371,
+    "south": -29.3551,
+    "east": -48.3585,
+    "north": -25.9558,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -53.99,
+    -29.51,
+    -48.2,
+    -25.8
+   ]
+  },
+  {
+   "code": "BR-RS",
+   "ibge": "43",
+   "name": "Rio Grande do Sul",
+   "name_en": "Rio Grande do Sul",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -57.6497,
+    "south": -33.7508,
+    "east": -49.6914,
+    "north": -27.0823,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -57.8,
+    -33.91,
+    -49.54,
+    -26.93
+   ]
+  },
+  {
+   "code": "BR-MS",
+   "ibge": "50",
+   "name": "Mato Grosso do Sul",
+   "name_en": "Mato Grosso do Sul",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -58.1686,
+    "south": -24.0682,
+    "east": -50.9242,
+    "north": -17.1663,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -58.32,
+    -24.22,
+    -50.77,
+    -17.01
+   ]
+  },
+  {
+   "code": "BR-MT",
+   "ibge": "51",
+   "name": "Mato Grosso",
+   "name_en": "Mato Grosso",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -61.6334,
+    "south": -18.0416,
+    "east": -50.2248,
+    "north": -7.349,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -61.79,
+    -18.2,
+    -50.07,
+    -7.19
+   ]
+  },
+  {
+   "code": "BR-GO",
+   "ibge": "52",
+   "name": "Goiás",
+   "name_en": "Goias",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "state (estado)",
+   "bbox": {
+    "west": -53.2485,
+    "south": -19.4981,
+    "east": -45.9072,
+    "north": -12.3954,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -53.4,
+    -19.65,
+    -45.75,
+    -12.24
+   ]
+  },
+  {
+   "code": "BR-DF",
+   "ibge": "53",
+   "name": "Distrito Federal",
+   "name_en": "Federal District",
+   "country": "Brazil",
+   "country_iso": "BR",
+   "admin_level": "federal district",
+   "bbox": {
+    "west": -48.2857,
+    "south": -16.05,
+    "east": -47.3085,
+    "north": -15.5018,
+    "source": {
+     "dataset": "IBGE malhas territoriais, state layer (estadual), malhas API with qualidade=maxima",
+     "publisher": "IBGE",
+     "licence": "IBGE-unclear",
+     "verified": "polygons read 2026-11-20; licence not settled"
+    }
+   },
+   "box_margin": [
+    -48.44,
+    -16.2,
+    -47.15,
+    -15.35
+   ],
+   "notes": "DF lies inside the BR-GO box; open question whether GO includes DF."
+  }
+ ],
+ "help_points": {
+  "ambulance_samu": {
+   "number": "192",
+   "verified": "Ministry of Communications, 'Emergência: você sabe para quem ligar quando precisa de ajuda?', published 2026-09-11, updated 2026-10-27, opened 2026-11-21, https://www.gov.br/mcom/pt-br/noticias/2026/setembro/emergencia-voce-sabe-para-quem-ligar-quando-precisa-de-ajuda/"
+  },
+  "fire_corpo_de_bombeiros": {
+   "number": "193",
+   "verified": "Ministry of Communications, 'Emergência: você sabe para quem ligar quando precisa de ajuda?', published 2026-09-11, updated 2026-10-27, opened 2026-11-21, https://www.gov.br/mcom/pt-br/noticias/2026/setembro/emergencia-voce-sabe-para-quem-ligar-quando-precisa-de-ajuda/"
+  },
+  "police_policia_militar": {
+   "number": "190",
+   "verified": "Ministry of Communications, 'Emergência: você sabe para quem ligar quando precisa de ajuda?', published 2026-09-11, updated 2026-10-27, opened 2026-11-21, https://www.gov.br/mcom/pt-br/noticias/2026/setembro/emergencia-voce-sabe-para-quem-ligar-quando-precisa-de-ajuda/"
+  },
+  "civil_defence": {
+   "number": "199",
+   "verified": "Ministry of Communications, 'Emergência: você sabe para quem ligar quando precisa de ajuda?', published 2026-09-11, updated 2026-10-27, opened 2026-11-21, https://www.gov.br/mcom/pt-br/noticias/2026/setembro/emergencia-voce-sabe-para-quem-ligar-quando-precisa-de-ajuda/"
+  },
+  "conditional_redirect_112_911": {
+   "number": "112 and 911",
+   "type": "conditional redirect",
+   "works_from": "mobile (the Anatel codes page lists them as mobile only)",
+   "condition": "Redirected to the matching Brazilian emergency service only if technically feasible (Anatel Resolution 777, article 127).",
+   "verified": "opened Anatel Resolution 777, article 127, 2026-11-21, https://informacoes.anatel.gov.br/legislacao/resolucoes/2025/2022-resolucao-777"
+  },
+  "not_included": "191 (Polícia Rodoviária Federal) and 180 (Central de Atendimento à Mulher), both listed on the Ministry of Communications page (https://www.gov.br/mcom/pt-br/noticias/2026/setembro/emergencia-voce-sabe-para-quem-ligar-quando-precisa-de-ajuda/), and state or city numbers.",
+  "cnes_health_establishments": {
+   "dataset": "CNES - Cadastro Nacional de Estabelecimentos de Saúde (health establishments)",
+   "publisher": "Ministério da Saúde (DATASUS)",
+   "url": "https://dadosabertos.saude.gov.br/dataset/cnes-cadastro-nacional-de-estabelecimentos-de-saude",
+   "licence": "cc-by ('Creative Commons Atribuição'), from the dataset page's licence field, opened 2026-11-20",
+   "verified": "dataset page opened 2026-11-20; licence field read. Coordinates (latitude and longitude) not verified; check the layout before a build.",
+   "caveat": "The footer of the same portal says the site's content is CC BY-ND 3.0 (Atribuição-SemDerivações). That refers to the site, not to the dataset. The dataset licence field is the one that matters for the data; maintainers should confirm.",
+   "role": "candidate"
+  },
+  "osm_counts": "Counts for hospital, clinic, fire_station and police are in osm_counts. Fire and police lists from the states were not checked.",
+  "shelters": "Not checked: no open national shelter list was found in this pass; OSM amenity=shelter not counted here."
+ },
+ "open_questions": [
+  "DF inside the BR-GO box: separate maps, or should the Goiás map include DF (as the Argentina proposal suggests for CABA)?",
+  "Should BR- hyphenated codes become file and manifest names, with carry_over widened to match? That change touches the upgrade path and needs review.",
+  "Does the IBGE technical and legal note for the state malha allow a copy in a build?",
+  "Trindade and Martim Vaz: a separate small map, or no map? No resident population was checked.",
+  "Atol das Rocas (RN) and São Pedro e São Paulo (PE): not in the IBGE polygons; should either have a map?",
+  "Is there an open CEP-area or CEP-to-state source with clear rights? Without one, address search cannot split by state.",
+  "Water: ask ANA which licence applies to BHO 6 and ask CPRM for the SIAGAS data licence. Both fail the test until answered.",
+  "CNES: the dataset licence field says cc-by, but the portal footer says CC BY-ND for its site content. Maintainers should confirm which governs."
+ ],
+ "osm_counts": {
+  "date": "2026-11-20",
+  "method": "Overpass API (overpass-api.de), one request per unit: area ISO3166-2 BR-XX with admin_level=4 (Brazil: ISO3166-1 BR, admin_level=2); nwr with each tag; out count. Counts are objects in OSM, not checked for duplicates or closed features.",
+  "licence": "ODbL-1.0",
+  "tags": [
+   "amenity=drinking_water",
+   "man_made=water_tap",
+   "natural=spring",
+   "man_made=water_well",
+   "amenity=hospital",
+   "amenity=clinic",
+   "amenity=fire_station",
+   "amenity=police"
+  ],
+  "counts": {
+   "AC": {
+    "amenity=drinking_water": 1,
+    "man_made=water_tap": 0,
+    "natural=spring": 19,
+    "man_made=water_well": 1,
+    "amenity=hospital": 26,
+    "amenity=clinic": 21,
+    "amenity=fire_station": 1,
+    "amenity=police": 21
+   },
+   "AL": {
+    "amenity=drinking_water": 5,
+    "man_made=water_tap": 0,
+    "natural=spring": 6,
+    "man_made=water_well": 93,
+    "amenity=hospital": 111,
+    "amenity=clinic": 154,
+    "amenity=fire_station": 10,
+    "amenity=police": 82
+   },
+   "AP": {
+    "amenity=drinking_water": 0,
+    "man_made=water_tap": 0,
+    "natural=spring": 2,
+    "man_made=water_well": 1,
+    "amenity=hospital": 38,
+    "amenity=clinic": 89,
+    "amenity=fire_station": 5,
+    "amenity=police": 46
+   },
+   "AM": {
+    "amenity=drinking_water": 14,
+    "man_made=water_tap": 1,
+    "natural=spring": 19,
+    "man_made=water_well": 6,
+    "amenity=hospital": 131,
+    "amenity=clinic": 147,
+    "amenity=fire_station": 11,
+    "amenity=police": 77
+   },
+   "BA": {
+    "amenity=drinking_water": 32,
+    "man_made=water_tap": 12,
+    "natural=spring": 103,
+    "man_made=water_well": 26,
+    "amenity=hospital": 656,
+    "amenity=clinic": 1163,
+    "amenity=fire_station": 25,
+    "amenity=police": 529
+   },
+   "CE": {
+    "amenity=drinking_water": 60,
+    "man_made=water_tap": 5,
+    "natural=spring": 15,
+    "man_made=water_well": 168,
+    "amenity=hospital": 344,
+    "amenity=clinic": 680,
+    "amenity=fire_station": 19,
+    "amenity=police": 253
+   },
+   "DF": {
+    "amenity=drinking_water": 34,
+    "man_made=water_tap": 12,
+    "natural=spring": 21,
+    "man_made=water_well": 2,
+    "amenity=hospital": 126,
+    "amenity=clinic": 190,
+    "amenity=fire_station": 42,
+    "amenity=police": 202
+   },
+   "ES": {
+    "amenity=drinking_water": 41,
+    "man_made=water_tap": 3,
+    "natural=spring": 15,
+    "man_made=water_well": 3,
+    "amenity=hospital": 144,
+    "amenity=clinic": 432,
+    "amenity=fire_station": 20,
+    "amenity=police": 250
+   },
+   "GO": {
+    "amenity=drinking_water": 29,
+    "man_made=water_tap": 2,
+    "natural=spring": 111,
+    "man_made=water_well": 14,
+    "amenity=hospital": 327,
+    "amenity=clinic": 312,
+    "amenity=fire_station": 34,
+    "amenity=police": 213
+   },
+   "MA": {
+    "amenity=drinking_water": 5,
+    "man_made=water_tap": 1,
+    "natural=spring": 4,
+    "man_made=water_well": 23,
+    "amenity=hospital": 228,
+    "amenity=clinic": 178,
+    "amenity=fire_station": 16,
+    "amenity=police": 118
+   },
+   "MT": {
+    "amenity=drinking_water": 4,
+    "man_made=water_tap": 7,
+    "natural=spring": "not counted",
+    "man_made=water_well": 3,
+    "amenity=hospital": 181,
+    "amenity=clinic": 270,
+    "amenity=fire_station": 25,
+    "amenity=police": 172
+   },
+   "MS": {
+    "amenity=drinking_water": 9,
+    "man_made=water_tap": 0,
+    "natural=spring": 174,
+    "man_made=water_well": 6,
+    "amenity=hospital": 115,
+    "amenity=clinic": 87,
+    "amenity=fire_station": 19,
+    "amenity=police": 121
+   },
+   "MG": {
+    "amenity=drinking_water": 142,
+    "man_made=water_tap": 15,
+    "natural=spring": 1697,
+    "man_made=water_well": 54,
+    "amenity=hospital": 860,
+    "amenity=clinic": 1234,
+    "amenity=fire_station": 63,
+    "amenity=police": 656
+   },
+   "PA": {
+    "amenity=drinking_water": 42,
+    "man_made=water_tap": 0,
+    "natural=spring": 23,
+    "man_made=water_well": 16,
+    "amenity=hospital": 270,
+    "amenity=clinic": 229,
+    "amenity=fire_station": 16,
+    "amenity=police": 141
+   },
+   "PB": {
+    "amenity=drinking_water": 34,
+    "man_made=water_tap": 14,
+    "natural=spring": 15,
+    "man_made=water_well": 83,
+    "amenity=hospital": 213,
+    "amenity=clinic": 271,
+    "amenity=fire_station": 18,
+    "amenity=police": 107
+   },
+   "PR": {
+    "amenity=drinking_water": 101,
+    "man_made=water_tap": 37,
+    "natural=spring": 228,
+    "man_made=water_well": 33,
+    "amenity=hospital": 510,
+    "amenity=clinic": 930,
+    "amenity=fire_station": 92,
+    "amenity=police": 454
+   },
+   "PE": {
+    "amenity=drinking_water": 18,
+    "man_made=water_tap": 6,
+    "natural=spring": 245,
+    "man_made=water_well": 40,
+    "amenity=hospital": 431,
+    "amenity=clinic": 529,
+    "amenity=fire_station": 30,
+    "amenity=police": 209
+   },
+   "PI": {
+    "amenity=drinking_water": 9,
+    "man_made=water_tap": 0,
+    "natural=spring": 9,
+    "man_made=water_well": 29,
+    "amenity=hospital": 228,
+    "amenity=clinic": 478,
+    "amenity=fire_station": 3,
+    "amenity=police": 106
+   },
+   "RJ": {
+    "amenity=drinking_water": 71,
+    "man_made=water_tap": 22,
+    "natural=spring": 727,
+    "man_made=water_well": 54,
+    "amenity=hospital": 603,
+    "amenity=clinic": 797,
+    "amenity=fire_station": 118,
+    "amenity=police": 541
+   },
+   "RN": {
+    "amenity=drinking_water": 33,
+    "man_made=water_tap": 2,
+    "natural=spring": 5,
+    "man_made=water_well": 55,
+    "amenity=hospital": 191,
+    "amenity=clinic": 439,
+    "amenity=fire_station": 8,
+    "amenity=police": 180
+   },
+   "RS": {
+    "amenity=drinking_water": 88,
+    "man_made=water_tap": 30,
+    "natural=spring": 84,
+    "man_made=water_well": 38,
+    "amenity=hospital": 560,
+    "amenity=clinic": 1056,
+    "amenity=fire_station": 132,
+    "amenity=police": 583
+   },
+   "RO": {
+    "amenity=drinking_water": 3,
+    "man_made=water_tap": 0,
+    "natural=spring": 3,
+    "man_made=water_well": 0,
+    "amenity=hospital": 52,
+    "amenity=clinic": 41,
+    "amenity=fire_station": 6,
+    "amenity=police": 71
+   },
+   "RR": {
+    "amenity=drinking_water": 12,
+    "man_made=water_tap": 0,
+    "natural=spring": 4,
+    "man_made=water_well": 2,
+    "amenity=hospital": 23,
+    "amenity=clinic": 65,
+    "amenity=fire_station": 6,
+    "amenity=police": 55
+   },
+   "SC": {
+    "amenity=drinking_water": 34,
+    "man_made=water_tap": 3,
+    "natural=spring": 484,
+    "man_made=water_well": 20,
+    "amenity=hospital": 252,
+    "amenity=clinic": 1240,
+    "amenity=fire_station": 193,
+    "amenity=police": 459
+   },
+   "SP": {
+    "amenity=drinking_water": 470,
+    "man_made=water_tap": 92,
+    "natural=spring": 2411,
+    "man_made=water_well": 136,
+    "amenity=hospital": 1370,
+    "amenity=clinic": 2663,
+    "amenity=fire_station": 234,
+    "amenity=police": 2195
+   },
+   "SE": {
+    "amenity=drinking_water": 7,
+    "man_made=water_tap": 1,
+    "natural=spring": 7,
+    "man_made=water_well": 4,
+    "amenity=hospital": 72,
+    "amenity=clinic": 274,
+    "amenity=fire_station": 10,
+    "amenity=police": 146
+   },
+   "TO": {
+    "amenity=drinking_water": 7,
+    "man_made=water_tap": 0,
+    "natural=spring": 11,
+    "man_made=water_well": 0,
+    "amenity=hospital": 52,
+    "amenity=clinic": 75,
+    "amenity=fire_station": 2,
+    "amenity=police": 28
+   }
+  },
+  "note": "MT natural=spring is marked not counted. Overpass gives 53,580. Split used: the IBGE tight box for BR-MT (W -61.6334, S -18.0416, E -50.2248, N -7.3490) cut at latitude -12.6953 and longitude -55.9291, each quarter intersected with the OSM BR-MT area: south-west 31,074, south-east 19,825, north-west 40, north-east 2,641 (sum 53,580; a whole-state count on 2026-11-21 gave the same total). 50,807 springs (31,006 south-west, 19,801 south-east) are in eight changesets by one OSM user (danctc) on 2025-11-06 (174297625, 174297760, 174297826, 174297902, 174298479, 174298489, 174298500, 174298643), all tagged source=SEMA-MT, with no discussion comments. No permission for SEMA-MT data was found (OSM wiki Contributors page and Import/Catalogue: no entry; SEMA-MT site footer: 'Todos os Direitos reservados'). Not counted or shipped until a licence is documented. Checked 2026-11-21. The column total is not counted either. Sum of the other 26 units is not shown for that column. The 27-unit sum is used as the total elsewhere; a single country-wide query timed out on the Overpass server. TO was retried after 502/504 errors and then read successfully."
+ },
+ "water": {
+  "proposed": [
+   {
+    "layer": "water.sqlite",
+    "dataset": "OpenStreetMap waterways and water areas (Brazil)",
+    "licence": "ODbL-1.0",
+    "verified": "ODbL 1.0 read on opendatacommons.org, 2026-11-20",
+    "role": "primary",
+    "notes": "Used as the base water layer, as in the US build."
+   },
+   {
+    "layer": "poi rows (drinking water)",
+    "dataset": "OSM amenity=drinking_water, man_made=water_tap, natural=spring, man_made=water_well",
+    "licence": "ODbL-1.0",
+    "verified": "counts per unit read through Overpass on 2026-11-20 (see osm_counts)",
+    "role": "help point",
+    "notes": "Springs and wells are shown with a plain 'not checked for drinking' label, as in REGIONS-ES.md."
+   }
+  ],
+  "not_proposed": [
+   {
+    "dataset": "ANA Base Hidrográfica Ottocodificada (BHO 6)",
+    "publisher": "ANA (Agência Nacional de Águas e Saneamento Básico)",
+    "reason": "The metadata record (metadados.snirh.gov.br, opened 2026-11-20) states the licence field as 'O acesso ao dado é livre.' ('Access to the data is free.'). No licence is named, and nothing states that adaptation or commercial use is allowed. It fails the test.",
+    "next_step": "Ask ANA which licence applies to the BHO and to its dataset page on dadosabertos.ana.gov.br."
+   },
+   {
+    "dataset": "CPRM SIAGAS (groundwater wells)",
+    "publisher": "CPRM / Serviço Geológico do Brasil",
+    "reason": "The SIAGAS web portal (siagasweb.sgb.gov.br, opened 2026-11-20) shows no licence or terms text. Agreements and reports describe software licences, not data licences. Search results also say full data may need a request. No licence can be read, so it fails the test.",
+    "next_step": "Ask CPRM for the licence of the SIAGAS data export. Until then, OSM water_well counts stand in."
+   },
+   {
+    "dataset": "Ministry of Health open-data plan documents (CC BY-NC-SA)",
+    "publisher": "Ministério da Saúde",
+    "reason": "Search results say the Ministry's open-data plans are CC BY-NC-SA 4.0 (non-commercial, share-alike). The plan PDFs were not opened. This is not used for any dataset here, and the CNES dataset's own licence field is cc-by.",
+    "next_step": "None needed for CNES. Note only."
+   }
+  ]
+ }
+}

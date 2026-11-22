@@ -5,8 +5,10 @@ const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fileUrl = p => '/' + String(p || '').split('/').map(encodeURIComponent).join('/');
 const main = $('#main');
+const i18n = globalThis.LastbookI18n;
 const IN_WINDOW = location.protocol === 'lastbook:' || location.hostname === 'lastbook.invalid';   // the desktop app, not a browser over the server
 if (IN_WINDOW) $('#sideSettings').hidden = false;   // Library and local AI (web/setup.html) is in the desktop app only
+$('.skip').addEventListener('click', e => { e.preventDefault(); main.focus() });
 
 /* ---------------------------------------------------------------- icons -- */
 const I = {
@@ -112,7 +114,15 @@ async function recents() {   // documents and videos from another library leave 
   const ok = new Set(await held(ids)), seen = new Set();
   return r.filter(x => (!/^[dv]:/.test(x.key) || ok.has(x.key.slice(2))) && !seen.has(rowId(x)) && seen.add(rowId(x)));
 }
-function setVprog(id, data) { const p = vprog(); p[id] = { ...(p[id] || {}), ...data, at: Date.now() }; const keys = Object.keys(p).sort((a, b) => p[b].at - p[a].at).slice(0, 60); store.set('vprog', Object.fromEntries(keys.map(k => [k, p[k]]))) }
+function setVprog(id, data) {
+  const p = vprog();
+  // Preserve legacy completion before a seek or replay replaces its progress.
+  // New progress alone must not turn an unwatched video into a watched one.
+  if (vwatched()[id] === undefined) setWatched(id, isWatched(id, p[id], { duration: data.d }));
+  p[id] = { ...(p[id] || {}), ...data, at: Date.now() };
+  const keys = Object.keys(p).sort((a, b) => p[b].at - p[a].at).slice(0, 60);
+  store.set('vprog', Object.fromEntries(keys.map(k => [k, p[k]])));
+}
 
 /* --------------------------------------------------------------- data -- */
 async function api(u, opts) {
@@ -191,8 +201,11 @@ function vcard(v, opts = {}) {
     <b>${esc(v.title)}</b><span class="vm">${esc(opts.sub || v.publisher || '')}</span></a>`;
 }
 function rail(html, cls = '') {
-  return `<div class="rail-wrap"><button class="rail-btn l" aria-label="Scroll left" hidden>${ico('back')}</button><div class="rail ${cls}">${html}</div><button class="rail-btn r" aria-label="Scroll right">${ico('right')}</button></div>`;
+  return `<div class="rail-wrap"><button class="rail-btn l" aria-label="Scroll left" data-i18n-aria-label="nav.scrollLeft" data-i18n-lang hidden>${ico('back')}</button><div class="rail ${cls}">${html}</div><button class="rail-btn r" aria-label="Scroll right" data-i18n-aria-label="nav.scrollRight" data-i18n-lang>${ico('right')}</button></div>`;
 }
+// Translate the marked interface text inside markup that was just rendered into `root`
+// (a page, or one section filled in later). Static page chrome is translated by the language policy itself.
+function translateRendered(root = main) { i18n?.apply(root) }
 function wireRails(root = main) {
   $$('.rail-wrap', root).forEach(w => {
     const r = $('.rail', w), l = $('.rail-btn.l', w), rb = $('.rail-btn.r', w);
@@ -204,23 +217,28 @@ function wireRails(root = main) {
 }
 const secHead = (title, sub, link) => `<div class="sec-head"><div><h2>${title}</h2>${sub ? `<span class="sub">${sub}</span>` : ''}</div>${link || ''}</div>`;
 function crumbs(list) {
-  return `<nav class="crumbs" aria-label="You are here">${list.map((c, i) => i < list.length - 1 ? `<a href="${c[1]}">${esc(c[0])}</a><span aria-hidden="true">›</span>` : `<span aria-current="page">${esc(c[0])}</span>`).join('')}</nav>`;
+  return `<nav class="crumbs" aria-labelledby="crumbLabel"><span class="sr" id="crumbLabel" data-i18n="nav.currentPath">You are here</span>${list.map((c, i) => i < list.length - 1 ? `<a href="${c[1]}">${esc(c[0])}</a><span aria-hidden="true">›</span>` : `<span aria-current="page">${esc(c[0])}</span>`).join('')}</nav>`;
 }
-function backButton(from, fallback = 'Back') {
-  let label = fallback, href = from || '#/';
+// A label is [message key, English text]. A plain string is still accepted: it keeps its text, and the few
+// common ones keep their translation.
+const KNOWN_LABELS = { Back: 'nav.back', Videos: 'nav.videos', Library: 'nav.library', Search: 'search.label', Go: 'search.go', Filter: 'search.filter' };
+const labelPair = (label, fallback) => Array.isArray(label) ? label : typeof label === 'string' ? [KNOWN_LABELS[label] || null, label] : fallback;
+function backButton(from, fallback) {
+  let [key, label] = labelPair(fallback, ['nav.back', 'Back']);
+  const href = from?.startsWith('#') ? from : '#/';
   const m = /^#\/t\/([\w-]+)/.exec(href);
-  if (m && topicById(m[1])) label = SHORT[m[1]] || topicById(m[1]).title;
-  else if (href.startsWith('#/search')) label = 'Search results';
-  else if (href.startsWith('#/ask')) label = 'Back to chat';
-  else if (href.startsWith('#/saved')) label = 'Saved';
-  else if (href.startsWith('#/map')) label = 'Map';
-  else if (href.startsWith('#/videos')) label = 'Videos';
-  else if (href.startsWith('#/guides')) label = 'Guides';
-  else if (href.startsWith('#/watch')) label = 'Video';
-  else if (href.startsWith('#/read')) label = 'Back to page';
-  else if (href.startsWith('#/library') || href.startsWith('#/shelf') || href.startsWith('#/collection') || href.startsWith('#/encyclopedias') || href.startsWith('#/prepare')) label = 'Library';
-  else if (href === '#/' || href === '#') label = 'Videos';
-  return `<a class="back" href="${esc(href)}" data-back>${ico('back')}<span>${esc(label)}</span></a>`;
+  if (m && topicById(m[1])) [key, label] = [null, SHORT[m[1]] || topicById(m[1]).title];
+  else if (href.startsWith('#/search')) [key, label] = ['search.results', 'Search results'];
+  else if (href.startsWith('#/ask')) [key, label] = ['nav.backToChat', 'Back to chat'];
+  else if (href.startsWith('#/saved')) [key, label] = ['nav.saved', 'Saved'];
+  else if (href.startsWith('#/map')) [key, label] = ['nav.map', 'Map'];
+  else if (href.startsWith('#/videos')) [key, label] = ['nav.videos', 'Videos'];
+  else if (href.startsWith('#/guides')) [key, label] = ['nav.guides', 'Guides'];
+  else if (href.startsWith('#/watch')) [key, label] = ['nav.video', 'Video'];
+  else if (href.startsWith('#/read')) [key, label] = ['nav.backToPage', 'Back to page'];
+  else if (href.startsWith('#/library') || href.startsWith('#/shelf') || href.startsWith('#/collection') || href.startsWith('#/encyclopedias') || href.startsWith('#/prepare')) [key, label] = ['nav.library', 'Library'];
+  else if (href === '#/' || href === '#') [key, label] = ['nav.videos', 'Videos'];
+  return `<a class="back" href="${esc(href)}" data-back>${ico('back')}<span${key ? ` data-i18n="${key}"` : ''}>${esc(label)}</span></a>`;
 }
 // Links into readers carry where you came from; refresh it at click time (sections may have opened since render).
 document.addEventListener('click', e => {
@@ -290,8 +308,9 @@ async function route() {
   const nav = v === 'read' && (q.get('from') || '').startsWith('#/about') ? 'about' : NAV_OF[v] || '';   // Sources, opened from About, stays under About
   $$('[data-nav]').forEach(a => nav && (a.dataset.nav === nav || (a.dataset.also || '').split(' ').includes(nav)) ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
   const rows = $$('.side a.row-s'); rows.forEach(a => a.tabIndex = a.hasAttribute('aria-current') || (!nav && a === rows[0]) ? 0 : -1);   // the sidebar is one Tab stop; arrows move inside it
-  savedCount(); railTitles();
+  savedCount();
   html.classList.remove('side-open', 'h1-gone'); h1seen.disconnect();
+  railTitles();
   $('#tbActs').replaceChildren(); $('#tbTitle').textContent = $('#tbSub').textContent = ''; $('#tbTitle').title = $('#tbSub').title = ''; searchLive = null; main.classList.remove('own-title');
   if (leaving) { try { leaving() } catch { } leaving = null }
   window.onresize = null; main.onkeydown = null;
@@ -302,7 +321,7 @@ async function route() {
     else if (v === 't') await topicPage(parts[1], parts[2]);
     else if (v === 'ask') await Chat.page(main, parts.slice(1), q);
     else if (v === 'videos') await (parts[1] ? videoRow(parts[1], q) : videosHome());
-    else if (v === 'watch') await watch(parts[1], +q.get('t') || 0, q.get('from'));
+    else if (v === 'watch') await watch(parts[1], q.get('t'), q.get('from'));
     else if (v === 'read') await reader(parts[1], +q.get('p') || 0, q.get('from'), q.get('view'));
     else if (v === 'wiki') await wiki(parts.slice(1).join('/'), q.get('from'), y);
     else if (v === 'search') await searchPage(q.get('q') || '', q.get('kind') || 'all');
@@ -317,7 +336,7 @@ async function route() {
     else if (v === 'about') await about();
     else notFound();
   } catch (e) { setTitle(''); document.body.className = 'v-error'; main.innerHTML = emptyState('warn', 'This page could not be opened', e.message || e) }   // v-error: not a reading page, so a phone keeps its tab bar
-  wireRails(); dock(); barState();
+  translateRendered(); wireRails(); dock(); barState();
   $('#topQ').value = '';
   const big = $('main h1'); if (big) h1seen.observe(big);
   if (v === 'ask') { bandState(); return }  // the chat manages its own scroll position
@@ -369,11 +388,21 @@ const html = document.documentElement, MAC = html.classList.contains('plat-mac')
 const wide = matchMedia('(min-width:900px)');
 // The toolbar names the page once its large title has scrolled up under the toolbar.
 const h1seen = new IntersectionObserver(es => html.classList.toggle('h1-gone', !es[es.length - 1].isIntersecting), { rootMargin: `-${(parseInt(getComputedStyle(html).getPropertyValue('--top-h')) || 52) + (parseInt(getComputedStyle(html).getPropertyValue('--cap-h')) || 0)}px 0px 0px 0px` });
-// Windows' folded pane shows icons only: each row then carries its name as a tooltip, which is also its name for a screen reader.
+// Windows' folded pane shows icons only. Use the translated row names as tooltips.
 function railTitles() { const icons = html.classList.contains('compact') && !html.classList.contains('side-open'); $$('.side a.row-s').forEach(a => icons ? a.title = $('span', a).textContent : a.removeAttribute('title')) }
 addEventListener('resize', railTitles);
 // The toolbar's field says only 'Search' when it is too narrow for the whole hint, as Windows' and the Mac's own narrow fields do
-new ResizeObserver(() => { const q = $('#topQ'); if (q.clientWidth) q.placeholder = q.clientWidth < 175 ? 'Search' : 'Search the library' }).observe($('#topQ'));
+function searchPlaceholder() {
+  const q = $('#topQ');
+  if (!q.clientWidth) return;
+  const short = q.clientWidth < 175;
+  if (i18n) {
+    q.dataset.i18nPlaceholder = short ? 'search.label' : 'search.library';
+    i18n.apply(q);
+  } else q.placeholder = short ? 'Search' : 'Search the library';
+}
+new ResizeObserver(searchPlaceholder).observe($('#topQ'));
+document.addEventListener('lastbook:languagechange', () => { railTitles(); searchPlaceholder() });
 // At 900 and wider a page's .dock controls (view switch, Save, Ask) sit in the toolbar; narrower they stay in the page.
 const docks = () => wide.matches || (!MAC && innerWidth >= 640);
 function dock() {
@@ -436,9 +465,10 @@ document.addEventListener('keydown', e => {
   }
 });
 function notFound() { setTitle('Not found'); main.innerHTML = emptyState('search', 'That page isn’t here', 'The link may be from an older version of the guide.') }
-const emptyState = (icon, title, text) => `<div class="empty"><span class="e-ico">${ico(icon)}</span><b>${esc(title)}</b><p>${esc(text)}</p><p class="e-act"><a class="btn plain" href="#/">Go to Videos</a></p></div>`;
-function searchBox(id, value, placeholder, button = 'Search') {
-  return `<form class="bigsearch" role="search" id="${id}F">${ico('search')}<label class="sr" for="${id}">Search</label><input id="${id}" type="search" autocomplete="off" value="${esc(value || '')}" placeholder="${esc(placeholder)}" enterkeyhint="search"><button>${button}</button></form>`;
+const emptyState = (icon, title, text) => `<div class="empty"><span class="e-ico">${ico(icon)}</span><b>${esc(title)}</b><p>${esc(text)}</p><p class="e-act"><a class="btn plain" href="#/" data-i18n="nav.goToVideos">Go to Videos</a></p></div>`;
+function searchBox(id, value, placeholder, buttonLabel) {
+  const [key, button] = labelPair(buttonLabel, ['search.label', 'Search']);
+  return `<form class="bigsearch" role="search" id="${id}F">${ico('search')}<label class="sr" for="${id}" data-i18n="search.label">Search</label><input id="${id}" type="search" autocomplete="off" value="${esc(value || '')}" placeholder="${esc(placeholder)}" enterkeyhint="search"><button${key ? ` data-i18n="${key}"` : ''}>${esc(button)}</button></form>`;
 }
 
 /* --------------------------------------------------------------- home -- */
@@ -469,7 +499,7 @@ async function home() {
   try {
     const rows = await api('/api/videos');
     const g = rows.find(r => r.id === 'guides');
-    if (g && $('#homeVideos')) { $('#homeVideos').innerHTML = secHead('Watch how it’s done', 'Videos picked for the guides', '<a href="#/videos">All videos</a>') + rail(g.items.slice(0, 14).map(v => vcard(v, { style: tcStyle(v.guide) })).join('')); wireRails($('#homeVideos')) }
+    if (g && $('#homeVideos')) { $('#homeVideos').innerHTML = secHead('Watch how it’s done', 'Videos picked for the guides', '<a href="#/videos">All videos</a>') + rail(g.items.slice(0, 14).map(v => vcard(v, { style: tcStyle(v.guide) })).join('')); translateRendered($('#homeVideos')); wireRails($('#homeVideos')) }
   } catch { }
 }
 async function continueItems() {
@@ -565,8 +595,8 @@ async function videoRow(row, q) {
   let off = 0;
   const first = await api(`/api/videos/${row}?q=${encodeURIComponent(qq)}&len=${len}&sort=${sort}&offset=0`);
   setTitle(first.title);
-  main.innerHTML = `<div>${backButton('#/videos', 'Videos')}</div><h1 style="margin-top:12px">${esc(qq ? 'Videos: “' + qq + '”' : first.title)}</h1>${first.note ? `<p class="lead">${esc(first.note)}</p>` : ''}
-    <div class="vtools">${searchBox('vq', qq, 'Search these videos', 'Go')}
+  main.innerHTML = `<div>${backButton('#/videos')}</div><h1 style="margin-top:12px">${esc(qq ? 'Videos: “' + qq + '”' : first.title)}</h1>${first.note ? `<p class="lead">${esc(first.note)}</p>` : ''}
+    <div class="vtools">${searchBox('vq', qq, 'Search these videos', ['search.go', 'Go'])}
       <label class="sr" for="vsort">Sort</label><select id="vsort">${[['', 'Most useful first'], ['short', 'Shortest first'], ['new', 'Newest first'], ['az', 'A to Z']].map(([k, l]) => `<option value="${k}" ${k === sort ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
     <div class="chips" style="margin:8px 0 16px">${[['', 'Any length'], ['short', 'Under 10 min'], ['medium', '10–30 min'], ['long', 'Over 30 min']].map(([k, l]) => `<a class="chip ${k === len ? 'on' : ''}" href="${qs({ len: k })}">${l}</a>`).join('')}</div>
     <p class="muted small">${first.total.toLocaleString()} video${first.total === 1 ? '' : 's'}</p>
@@ -626,17 +656,19 @@ async function watch(id, t, from) {
   const selfHref = `#/watch/${encodeURIComponent(id)}`;
   remember({ key: 'v:' + id, title: d.title, href: selfHref, sub: 'Video · ' + fmtDur(d.duration) });
   const p = vprog()[id];
-  const resumeAt = !t && p && p.t > 15 && (!d.duration || p.t < d.duration - 20) ? p.t : 0;
-  main.innerHTML = `<div class="rtop">${backButton(from, 'Videos')}</div>
+  const start = t !== null && Number.isFinite(+t) && +t >= 0 ? +t : null;
+  const resumeAt = start === null && p && p.t > 15 && (!d.duration || p.t < d.duration - 20) ? p.t : 0;
+  main.innerHTML = `<div class="rtop">${backButton(from, ['nav.videos', 'Videos'])}</div>
   <div class="watch">
     <div>
-      <div class="player"><video id="vid" controls preload="metadata" playsinline src="${fileUrl(d.path)}${t ? '#t=' + t : ''}"></video></div>
+      <div class="player"><video id="vid" controls preload="metadata" playsinline src="${fileUrl(d.path)}${start !== null ? '#t=' + start : ''}"></video></div>
       <div class="video-speed"><label for="videoSpeed">Playback speed</label><select id="videoSpeed"><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1" selected>Normal</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></div>
       ${d.remote ? `<p class="small muted" style="margin:6px 0 0">Stored on the remote drive “${esc(d.remote)}”. It plays only while that computer is reachable.</p>` : ''}
       <h1 class="vtitle">${esc(d.title)}</h1>
       <div class="vmeta"><b>${esc(d.publisher || '')}</b><span>${fmtDur(d.duration)}</span>${d.upload_date ? `<span>${esc(d.upload_date.replace(/(\d{4})(\d\d)(\d\d)/, '$1-$2-$3'))}</span>` : ''}<span>${esc(d.trust)}</span></div>
       ${resumeAt ? `<div class="resume" id="resume">You stopped at ${clock(resumeAt)}. <button class="btn" id="resYes">Resume</button><button class="btn plain" id="resNo">Start over</button></div>` : ''}
       <div class="vactions dock">${saveButton({ key: 'v:' + id, title: d.title, href: selfHref, sub: 'Video · ' + fmtDur(d.duration) })}${watchedButton(id, d)}<a class="btn plain" title="Ask about this video" href="#/ask?about=${encodeURIComponent('video:' + id)}&${fromQ()}" id="askv">${ico('ask')}<span>Ask about this video</span></a></div>
+      ${momentSection(true)}
       <div class="notice small">A video shows how one person did something. Watching isn’t practice, and it may not match current safety guidance — check a manual for anything risky.</div>
     </div>
     <section class="txpanel" id="tx" aria-label="Transcript"><header><h2>Transcript</h2><label class="sr" for="cueQ">Find in transcript</label><input id="cueQ" type="search" placeholder="Find words in the transcript"></header>
@@ -645,6 +677,7 @@ async function watch(id, t, from) {
   <div id="morev"></div>
   <details class="about-src"><summary>About this video</summary><div class="in"><dl><dt>Channel</dt><dd>${esc(d.publisher || '—')}</dd><dt>Kind</dt><dd>${esc(d.trust)}</dd><dt>Length</dt><dd>${fmtDur(d.duration) || 'unknown'}</dd>${d.notes ? `<dt>Note</dt><dd>${esc(d.notes)}</dd>` : ''}${d.source_url ? `<dt>Online original</dt><dd>${esc(hostOf(d.source_url))} <span class="muted">(online; not needed here)</span></dd>` : ''}</dl></div></details>`;
   const vid = $('#vid');
+  wireMoments({ video: d, player: vid, start });
   const speed = $('#videoSpeed');
   speed.addEventListener('change', () => { vid.playbackRate = Number(speed.value) });
   // Native controls may also change the rate. Keep the visible control in sync.
@@ -752,8 +785,119 @@ async function watch(id, t, from) {
   });
   try {
     const rel = await api('/api/videos/related/' + encodeURIComponent(id));
-    if (rel.length && $('#morev')) { $('#morev').innerHTML = secHead('More like this') + rail(rel.map(v => vcard(v)).join('')); wireRails($('#morev')) }
+    if (rel.length && $('#morev')) { $('#morev').innerHTML = secHead('More like this') + rail(rel.map(v => vcard(v)).join('')); translateRendered($('#morev')); wireRails($('#morev')) }
   } catch { }
+}
+
+/* ------------------------------------------------------- video moments -- */
+function momentSection(watching = false) {
+  return `<section class="moments" aria-labelledby="momentsTitle">
+    <header class="moments-head"><h2 id="momentsTitle">${watching ? 'Saved moments' : 'Video moments'} <span id="momentCount" class="moment-count"></span></h2>
+      ${watching ? `<button class="btn plain" id="saveMoment" disabled>${ico('save')}<span>Save this moment</span></button>` : ''}</header>
+    <p class="moments-hint">${watching ? 'Keep the parts you want to return to.' : 'Your saved places in videos.'} Kept on this device.</p>
+    <div id="momentEditor"></div><ul class="moment-list" id="momentList"></ul>
+    <p id="momentStatus" class="moment-status" role="status"></p>
+  </section>`;
+}
+
+function wireMoments({ video = null, player = null, available = null, start = null } = {}) {
+  const root = $('.moments'), list = $('#momentList', root), editor = $('#momentEditor', root);
+  const status = $('#momentStatus', root), add = $('#saveMoment', root);
+  let editing = null;
+  const say = (text, error = false) => { status.textContent = text; status.classList.toggle('is-error', error) };
+  const focusRow = key => {
+    const button = $$('[data-moment-edit]', root).find(b => b.dataset.momentEdit === key);
+    if (button) button.focus(); else if (add) add.focus(); else $('#momentsTitle').focus();
+  };
+  $('#momentsTitle').tabIndex = -1;
+  const read = () => VideoMoments.readSaved().filter(VideoMoments.isMoment);
+  const draw = () => {
+    let items;
+    try { items = read() } catch (e) { say(e.message, true); return }
+    if (video) items = items.filter(x => x.videoId === video.id).sort((a, b) => a.time - b.time);
+    $('#momentCount', root).textContent = items.length || '';
+    list.innerHTML = items.length ? items.map(x => {
+      const missing = available && !available.has(x.videoId), title = esc(x.title), time = clock(x.time);
+      const content = `<span class="moment-time">${time}</span><span class="moment-name"><b>${title}</b>${!video ? `<small>${esc(x.videoTitle)}${missing ? ' · Not in this library' : ''}</small>` : ''}</span>`;
+      const open = video ? `<button class="moment-open" data-moment-play="${x.time}" aria-label="Play ${title} at ${time}">${content}</button>`
+        : missing ? `<span class="moment-open unavailable">${content}</span>`
+          : `<a class="moment-open" href="${esc(VideoMoments.href(x))}" aria-label="Open ${title} at ${time}">${content}</a>`;
+      return `<li>${open}<div class="moment-actions"><button data-moment-edit="${esc(x.key)}" aria-label="Rename ${title}">Rename</button><button data-moment-remove="${esc(x.key)}" aria-label="Remove ${title}">Remove</button></div></li>`;
+    }).join('') : `<li class="moment-empty">${video ? 'Pause at a useful part, then choose Save this moment.' : 'No video moments saved.'}</li>`;
+  };
+  const close = () => {
+    const key = editing && editing.key;
+    editing = null; editor.replaceChildren(); focusRow(key);
+  };
+  const edit = (item, seconds) => {
+    if (player) player.pause();
+    const time = item ? item.time : Math.floor(seconds);
+    editing = { key: item ? item.key : null, time };
+    editor.innerHTML = `<form class="moment-form"><p class="moment-form-title">${item ? 'Rename moment' : 'Save moment'} <span class="moment-time">${clock(time)}</span></p>
+      <label for="momentName">Name <span class="muted">(optional)</span></label>
+      <input id="momentName" type="text" maxlength="120" autocomplete="off" placeholder="For example, tools needed" value="${esc(item ? item.title : '')}">
+      <div class="moment-form-actions"><button class="btn" type="submit">${item ? 'Save changes' : 'Save moment'}</button><button class="btn plain" type="button" id="cancelMoment">Cancel</button></div></form>`;
+    say('');
+    $('#cancelMoment', editor).onclick = close;
+    $('form', editor).onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); close() } };
+    $('form', editor).onsubmit = e => {
+      e.preventDefault();
+      const title = $('#momentName', editor).value.trim() || 'Moment at ' + clock(editing.time);
+      try {
+        const item = editing.key ? VideoMoments.rename(editing.key, title) : VideoMoments.save(video, editing.time, title);
+        editing = null; editor.replaceChildren(); draw(); savedCount(); focusRow(item.key);
+        say('Moment saved on this device.');
+      } catch (e) { say(e.message, true) }
+    };
+    $('#momentName', editor).focus();
+  };
+  if (player) {
+    const ready = () => !player.error && player.readyState >= 1 && Number.isFinite(player.duration) && player.duration > 0;
+    const update = () => { add.disabled = !ready() };
+    player.addEventListener('loadedmetadata', update);
+    player.addEventListener('durationchange', update);
+    player.addEventListener('error', update);
+    const checkStart = () => {
+      if (ready() && start !== null && start >= player.duration)
+        say('This position is beyond the end of this video.', true);
+    };
+    player.addEventListener('loadedmetadata', checkStart, { once: true });
+    checkStart();
+    update();
+    add.onclick = () => {
+      if (!ready()) return;
+      const time = Math.floor(Math.min(player.currentTime, Math.max(0, player.duration - 0.001)));
+      try { edit(read().find(x => x.videoId === video.id && x.time === time), time) }
+      catch (e) { say(e.message, true) }
+    };
+  }
+  list.onclick = e => {
+    const play = e.target.closest('[data-moment-play]');
+    if (play && player) {
+      const time = +play.dataset.momentPlay;
+      if (player.readyState < 1 || player.error) return say('This video is not ready to play.', true);
+      if (time >= player.duration) return say('This moment is beyond the end of this video.', true);
+      player.currentTime = time; player.play().catch(() => { }); say(''); return;
+    }
+    const rename = e.target.closest('[data-moment-edit]'), remove = e.target.closest('[data-moment-remove]');
+    try {
+      if (rename) {
+        const item = read().find(x => x.key === rename.dataset.momentEdit);
+        if (!item) return say('This moment is no longer saved.', true);
+        edit(item);
+      }
+      if (remove) {
+        const key = remove.dataset.momentRemove;
+        VideoMoments.remove(key);
+        if (editing && editing.key === key) { editing = null; editor.replaceChildren() }
+        draw(); savedCount();
+        const next = $('[data-moment-edit]', root);
+        if (next) next.focus(); else if (add) add.focus(); else $('#momentsTitle').focus();
+        say('Moment removed.');
+      }
+    } catch (e) { say(e.message, true) }
+  };
+  draw();
 }
 
 /* ------------------------------------------------------------- reader -- */
@@ -778,9 +922,9 @@ async function reader(id, page, from, view) {
     <div class="rmodes">${views.length ? `<div class="seg dock" role="group" aria-label="How to show it">${views.map(([v, l]) => `<button data-view="${v}" aria-pressed="${v === view}">${l}</button>`).join('')}</div>` : ''}<span class="vactions dock">${askLink('doc:' + id + ':' + (isPdf ? page : 1), 'Ask')}${saveButton({ key, title: d.title + (isPdf ? ' — page ' + page : ''), href: selfHref, sub: d.publisher || d.kindLabel })}<button class="tb-btn insp-btn" data-insp aria-label="Show or hide the source details" title="Details">${ico('insp')}</button></span></div>
     <div id="docbody"></div>
     ${d.imageOnly ? '<div class="notice">This is a scanned document without searchable text, so search and the assistant can’t read it. Use the Page view.</div>' : ''}
-    ${isPdf && view !== 'pdf' ? `<div class="rbar"><a class="btn plain nav" href="${go(page - 1)}" ${page <= 1 ? 'aria-disabled="true" style="opacity:.35;pointer-events:none"' : ''} aria-label="Previous page">${ico('back')}<span>Previous</span></a>
+    ${isPdf && view !== 'pdf' ? `<div class="rbar"><a class="btn plain nav" href="${go(page - 1)}" ${page <= 1 ? 'aria-disabled="true" style="opacity:.35;pointer-events:none"' : ''} aria-label="Previous page" data-i18n-aria-label="nav.previousPage" data-i18n-lang>${ico('back')}<span data-i18n="nav.previous">Previous</span></a>
       <span class="pnum"><label class="sr" for="pg">Page number</label>Page <input id="pg" inputmode="numeric" value="${page}"> of ${total}</span>
-      <a class="btn nav" href="${go(page + 1)}" ${page >= total ? 'aria-disabled="true" style="opacity:.35;pointer-events:none"' : ''} aria-label="Next page"><span>Next</span>${ico('right')}</a></div>` : ''}
+      <a class="btn nav" href="${go(page + 1)}" ${page >= total ? 'aria-disabled="true" style="opacity:.35;pointer-events:none"' : ''} aria-label="Next page" data-i18n-aria-label="nav.nextPage" data-i18n-lang><span data-i18n="nav.next">Next</span>${ico('right')}</a></div>` : ''}
     <details class="about-src"><summary>About this source</summary><div class="in"><p class="insp-h">${esc(d.title)}</p>
       <dl><dt>Publisher</dt><dd>${esc(d.publisher || '—')}</dd><dt>Kind</dt><dd>${esc(d.trust)} · ${esc(d.kindLabel)}</dd>
       ${d.edition ? `<dt>Edition</dt><dd>${esc(d.edition)}</dd>` : ''}${d.year ? `<dt>Year</dt><dd>${esc(d.year)}</dd>` : ''}
@@ -1023,6 +1167,7 @@ async function searchPage(q, kind) {
   ${searchBox('searchQ', q, 'Describe it in everyday words')}
   <div class="chips" role="group" aria-label="Show" style="margin-top:12px" id="kinds">${kinds.map(([k, l]) => `<a class="chip ${k === kind ? 'on' : ''}" aria-pressed="${k === kind}" data-kind="${k}" href="#/search?q=${encodeURIComponent(q)}&kind=${k}">${l}</a>`).join('')}</div>
   <div id="sask"></div><div id="sout"></div>`;
+  i18n?.apply(main);
   const input = $('#searchQ');
   $('#searchQF').addEventListener('submit', e => { e.preventDefault(); input.blur(); go(input.value.trim(), true) });
   let tmr;
@@ -1067,7 +1212,7 @@ async function results(q, kind) {
       if (seq !== searchSeq) return true;
       const vids = (kind === 'video' ? d : vd)?.results || [];
       if (kind === 'video') { $('#sres').innerHTML = vids.length ? `<div class="vgrid" style="margin-top:14px">${vids.map(r => vcard(r)).join('')}</div>` : ''; return vids.length > 0 }
-      if (vids.length) { $('#svid').innerHTML = secHead('Videos', '', `<a href="#/search?q=${encodeURIComponent(q)}&kind=video">See all</a>`) + rail(vids.slice(0, 10).map(r => vcard(r)).join('')); wireRails($('#svid')) }
+      if (vids.length) { $('#svid').innerHTML = secHead('Videos', '', `<a href="#/search?q=${encodeURIComponent(q)}&kind=video">See all</a>`) + rail(vids.slice(0, 10).map(r => vcard(r)).join('')); translateRendered($('#svid')); wireRails($('#svid')) }
       $('#sres').innerHTML = d.results.length ? `<h2>In the manuals and saved pages</h2>
         ${d.expanded.length ? `<p class="small muted">Also looked for: ${d.expanded.slice(0, 10).map(esc).join(', ')}${d.mode === 'some words' ? ' · showing pages with some of your words' : ''}</p>` : ''}
         <div class="results">${d.results.map(resultCard).join('')}</div>` : '';
@@ -1162,8 +1307,8 @@ async function shelfPage(id, kind, q) {
   const sh = (await api('/api/shelves')).find(s => s.id === id);
   if (!sh) return notFound();
   setTitle(sh.title);
-  main.innerHTML = `${backButton('#/library', 'Library')}${crumbs([['Library', '#/library'], [sh.title]])}<h1>${esc(sh.title)}</h1>
-  <div style="margin:14px 0 10px">${searchBox('shq', q, 'Filter by title or publisher', 'Filter')}</div>
+  main.innerHTML = `${backButton('#/library')}${crumbs([['Library', '#/library'], [sh.title]])}<h1>${esc(sh.title)}</h1>
+  <div style="margin:14px 0 10px">${searchBox('shq', q, 'Filter by title or publisher', ['search.filter', 'Filter'])}</div>
   <div class="chips">${[['all', 'Everything'], ['read', 'To read'], ['video', 'Videos']].map(([k, l]) => `<a class="chip ${k === kind ? 'on' : ''}" href="#/shelf/${id}?kind=${k}&q=${encodeURIComponent(q)}">${l}</a>`).join('')}</div><div id="shres"><p class="loading">Loading…</p></div>`;
   $('#shqF').addEventListener('submit', e => { e.preventDefault(); location.hash = `#/shelf/${id}?kind=${kind}&q=` + encodeURIComponent($('#shq').value.trim()) });
   let off = 0;
@@ -1179,7 +1324,7 @@ async function shelfPage(id, kind, q) {
 }
 async function collectionPage(name, from) {
   setTitle(name);
-  main.innerHTML = `<div>${backButton(from, 'Library')}</div><h1 style="margin-top:12px">${esc(name)}</h1><ul class="list collection" id="cl"></ul><div id="cm"></div>`;
+  main.innerHTML = `<div>${backButton(from, ['nav.library', 'Library'])}</div><h1 style="margin-top:12px">${esc(name)}</h1><ul class="list collection" id="cl"></ul><div id="cm"></div>`;
   let off = 0;
   const load = async () => {
     const d = await api('/api/collection?name=' + encodeURIComponent(name) + '&offset=' + off);
@@ -1193,13 +1338,19 @@ async function collectionPage(name, from) {
 /* -------------------------------------------------------------- saved -- */
 async function savedPage() {
   setTitle('Saved');
-  const s = store.get('saved', []), r = await recents();
+  let all = [], savedError = '';
+  try { all = VideoMoments.readSaved() } catch (e) { savedError = e.message }
+  const moments = all.filter(VideoMoments.isMoment);
+  const s = all.filter(x => x && x.kind !== 'video-moment'), r = await recents();
   const li = x => `<li><a class="row" href="${esc(x.href)}"><span class="k">${ico(x.key[0] === 'v' ? 'video' : x.key[0] === 'w' ? 'wiki' : x.key[0] === 't' ? 'book' : x.key[0] === 'a' ? 'ask' : 'page')}</span><span><b>${esc(x.title)}</b><small>${esc(rowSub(x))}</small></span></a></li>`;
   const cont = await resumable();
+  const available = new Set(await held([...new Set(moments.map(x => x.videoId))]));
   main.innerHTML = `<h1>Saved</h1><p class="lead">Kept on this device only.</p>
-  ${s.length ? `<div class="collection" style="margin-top:18px"><ul class="list">${s.map(li).join('')}</ul></div>` : `<div class="empty"><span class="e-ico">${ico('save')}</span><b>Nothing saved yet</b><p>Choose Save on any page, video, article or answer to keep it here.</p></div>`}
+  ${savedError ? `<div class="err" role="alert">${esc(savedError)}</div>` : moments.length ? momentSection() : ''}
+  ${s.length ? `<div class="collection" style="margin-top:18px"><ul class="list">${s.map(li).join('')}</ul></div>` : !moments.length && !savedError ? `<div class="empty"><span class="e-ico">${ico('save')}</span><b>Nothing saved yet</b><p>Choose Save on any page, video, article or answer to keep it here.</p></div>` : ''}
   ${cont.length ? secHead('Continue watching') + rail(cont.map(([id, v]) => vcard({ id, title: v.title, thumb: v.thumb, duration: v.d }, { sub: 'Resume at ' + clock(v.t) })).join('')) : ''}
   ${secHead('Recently opened')}${r.length ? `<div class="collection"><ul class="list">${r.map(li).join('')}</ul></div><p><button class="btn plain" id="clr">Clear recent list</button></p>` : '<div class="empty"><p>Pages you open will appear here.</p></div>'}`;
+  if (moments.length) wireMoments({ available });
   const c = $('#clr'); if (c) c.onclick = () => { store.set('recent', []); savedPage() };
 }
 
@@ -1247,7 +1398,7 @@ function localAbout(st) {
   const l = st.local; if (!l) return '';
   const gb = n => (n / 1e9).toFixed(1) + ' GB';
   const where = (l.placement || []).filter(p => p.bytes > 2e8).map(p => `${gb(p.bytes)} on ${esc(p.device)}`).join(', ');
-  const line = { ready: 'running now', stopped: 'ready; it starts when you ask and stops after 15 minutes unused', loading: 'starting' }[l.state];
+  const line = { ready: 'running now', stopped: 'available; your first question loads it and may take a while; it stops after 15 minutes unused', loading: 'starting' }[l.state];
   const btn = (a, t) => `<button class="btn plain" onclick="localAI('${a}')">${t}</button>`;
   return line ? `Local AI: ${esc(l.name)}, ${line}.${where ? ` It uses ${where}.` : ''} It reads text only.
       <span class="row">${l.state === 'ready' ? btn('stop', 'Stop it now') : ''}${btn('off', 'Turn off')}</span>`

@@ -13,6 +13,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
+sys.path.insert(0, str(HERE))  # also when the build invokes this script with -I
+import i18n_catalogs  # noqa: E402
+
 EDITS = json.loads((HERE / 'ship_edits.json').read_text(encoding='utf-8'))
 LEFT = re.compile('|'.join(EDITS['forbidden']), re.I)
 WEB_ADDRESS = re.compile(r'https?://(?!www\.w3\.org/)', re.I)    # our own pages link nowhere on the web (an SVG or XML name space is not a link)
@@ -55,6 +58,11 @@ def clean(value):
 
 def main():
     out = Path(sys.argv[1])
+    try:
+        generated = i18n_catalogs.generate()
+        i18n_catalogs.check_assets(ROOT / 'web', generated)
+    except (OSError, ValueError) as error:
+        sys.exit(f'Not shipping. Localization: {error}')
     (out / 'web').mkdir(parents=True, exist_ok=True)
     (out / 'content' / 'topics').mkdir(parents=True, exist_ok=True)
     written = []
@@ -77,6 +85,10 @@ def main():
             bad.append(f'{p.relative_to(out)}: {p.read_text(encoding="utf-8", errors="replace")[max(0, m.start() - 40):m.end() + 40]!r}')
     if bad:
         sys.exit('Not shipping. Left in place:\n' + '\n'.join(bad))
+    try:
+        i18n_catalogs.check_assets(out / 'web', generated)
+    except (OSError, ValueError) as error:
+        sys.exit(f'Not shipping. Localization: {error}')
     print(f'{len(written)} files in {out}')
 
 

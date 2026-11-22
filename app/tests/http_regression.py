@@ -57,7 +57,7 @@ try:
         raise SystemExit('never answered')
     s, h, d = req('/')
     note('home page', s == 200 and b'<' in d[:50] and 'content-security-policy' not in h, f'{s} {len(d)} bytes, no CSP added')
-    for t in ('/ui/app.js', '/ui/words.js', '/ui/chat.js', '/ui/map.js', '/api/topics', '/api/library', '/api/shelves', '/sw.js', '/reader.css'):
+    for t in ('/ui/app.js', '/ui/words.js', '/ui/video-moments.js', '/ui/chat.js', '/ui/map.js', '/api/topics', '/api/library', '/api/shelves', '/sw.js', '/reader.css'):
         s, h, d = req(t)
         note(f'GET {t}', s == 200, f'{s} {len(d)} bytes')
     s, h, d = req('/api/map/info')

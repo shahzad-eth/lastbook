@@ -13,9 +13,9 @@ Website: <https://lastbook.org>. Contact: hello@lastbook.org.
 
 | Platform | Version | Status |
 |---|---|---|
-| macOS (Apple Silicon, macOS 14 or later) | 1.1.14 | Live on lastbook.org, signed and notarized |
-| Windows (64-bit, Windows 10 or later) | 1.1.14 | Live on lastbook.org, Authenticode signed |
-| Linux (Ubuntu 24.04 or 26.04 LTS, x86_64) | 1.1.14 | Ubuntu packages; installation instructions below |
+| macOS (Apple Silicon, macOS 14 or later) | 1.1.15 | Live on lastbook.org, signed and notarized |
+| Windows (64-bit, Windows 10 or later) | 1.1.15 | Live on lastbook.org, Authenticode signed |
+| Linux (Ubuntu 24.04 or 26.04 LTS, x86_64) | 1.1.15 | Ubuntu packages; installation instructions below |
 
 ## iPad (development preview, source only)
 
@@ -27,11 +27,11 @@ A native iPad app (Videos, Map and Chat, offline, with optional on-device AI) is
 ## Install on Linux
 
 The Linux packages target **Ubuntu 24.04 LTS and Ubuntu 26.04 LTS on Intel/AMD x86_64 computers**, one package for each. Download
-[Lastbook for Ubuntu 24.04](https://downloads.lastbook.org/Lastbook_1.1.14_amd64.deb) (or [for Ubuntu 26.04](https://downloads.lastbook.org/Lastbook_1.1.14_ubuntu26.04_amd64.deb)), then install it with apt so Ubuntu resolves its dependencies.
+[Lastbook for Ubuntu 24.04](https://downloads.lastbook.org/Lastbook_1.1.15_amd64.deb) (or [for Ubuntu 26.04](https://downloads.lastbook.org/Lastbook_1.1.15_ubuntu26.04_amd64.deb)), then install it with apt so Ubuntu resolves its dependencies.
 
 ```bash
-sudo apt install ./Lastbook_1.1.14_amd64.deb                  # Ubuntu 24.04
-sudo apt install ./Lastbook_1.1.14_ubuntu26.04_amd64.deb      # Ubuntu 26.04
+sudo apt install ./Lastbook_1.1.15_amd64.deb                  # Ubuntu 24.04
+sudo apt install ./Lastbook_1.1.15_ubuntu26.04_amd64.deb      # Ubuntu 26.04
 ```
 
 Open Lastbook from the application menu. First-run setup downloads your chosen library, state map and optional local AI.
@@ -53,6 +53,8 @@ other Linux distributions have not been validated for this release.
   picks the state; Lastbook never detects location.
 - **Optional local AI.** Ask questions in plain words and get answers that cite library pages, from a model that runs on
   the computer itself (see "The local AI" below). Without it, Chat still finds the right pages.
+- **Saved video moments.** Keep several named positions in a video and open them from the player or Saved. Names and
+  positions stay on this device; the video and its captions are unchanged.
 - **One-download setup.** On first run, setup defaults to Small and selects local AI when the computer can run it.
   The person can choose Small, Medium or All, selects a state map, and starts the checked downloads. A library already on the
   computer (a folder or a pack zip) can be used instead of downloading.
@@ -185,7 +187,8 @@ so some of its paths and ports describe that setup. The desktop app does not use
 
 The builds write into `derived/app-build/` and refuse to finish if the package scan finds something that must not ship:
 test code, a network call outside setup's downloader, a web address in our own pages, or a word from the private list
-(see below). The builds also run the TLS roots gate.
+(see below). The builds also run the TLS roots gate and check that the packaged
+localization assets are present and up to date. [Localization guide](docs/i18n.md)
 
 **macOS (Apple Silicon, needs [uv](https://github.com/astral-sh/uv)):**
 
@@ -235,9 +238,9 @@ bash packaging/linux/build_app_linux.sh
 
 The package uses the system Python and pinned wheels from `packaging/linux/requirements_linux.txt`, built for that Python
 only, so each release gets its own package. On 24.04 (Python 3.12) the app build creates
-`derived/app-build/linux/<timestamp>/Lastbook_1.1.14_amd64.deb`; on 26.04 (Python 3.14) it creates
-`Lastbook_1.1.14_ubuntu26.04_amd64.deb`, with the version `1.1.14+ubuntu26.04`, which apt takes as newer than the 24.04 package; on Debian 13 (Python 3.13) it creates
-`Lastbook_1.1.14_debian13_amd64.deb`, with the version `1.1.14+debian13`.
+`derived/app-build/linux/<timestamp>/Lastbook_1.1.15_amd64.deb`; on 26.04 (Python 3.14) it creates
+`Lastbook_1.1.15_ubuntu26.04_amd64.deb`, with the version `1.1.15+ubuntu26.04`, which apt takes as newer than the 24.04 package; on Debian 13 (Python 3.13) it creates
+`Lastbook_1.1.15_debian13_amd64.deb`, with the version `1.1.15+debian13`.
 It bundles the local AI runner when `derived/llm/bin-linux/lastbook-llm` exists. `packaging/linux/smoke_deb.sh` checks
 the package in a fresh container of the same release.
 Linux integration-test helpers live under `app/tests/linux_*`; set `LASTBOOK_TEST_HOST` to a Windows SSH host with WSL2

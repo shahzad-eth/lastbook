@@ -1863,6 +1863,23 @@ class PackPlan(unittest.TestCase):
         d = install.plan_update(self.lib, self.rows({**self.pack, 'derived/geo/national.sqlite': b'new base map' * 9}))
         self.assertEqual((d['changed'], d['kept']['map']), (['derived/geo/national.sqlite'], []))
 
+    def test_pack_map_with_a_map_set_is_compared(self):
+        map_file = 'derived/geo/national.sqlite'
+        pack = {
+            **self.pack,
+            'pack.json': b'{"name": "small", "map": "us"}',
+            'map-set.json': json.dumps({'name': 'us', 'files': {map_file: len(self.pack[map_file])}}).encode(),
+        }
+        for rel in ('pack.json', 'map-set.json'):
+            self.put(rel, pack[rel])
+        self.put('pack-manifest.tsv', self.listing(pack).encode())
+        replacement = bytes(len(pack[map_file]))
+
+        d = install.plan_update(self.lib, self.rows({**pack, map_file: replacement}))
+        self.assertEqual(d['changed'], [map_file])
+        self.assertEqual(d['fetch_bytes'], len(replacement))
+        self.assertEqual(d['kept']['map'], [])
+
     def test_model_addresses_and_other_files_are_kept(self):
         self.put('models/model.gguf', b'm' * 50)
         self.put('derived/geo/addresses/RI.sqlite', b'r' * 20)

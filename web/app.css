@@ -605,6 +605,35 @@ html.plat-win.in-app body:not(.v-wiki) .tb-title b{display:none}
 .cue mark{background:#ffe27a;color:#000}
 .txnote{font-size:13px;color:var(--ink3);padding:8px 14px;border-top:1px solid var(--line2)}
 
+/* Saved video positions, beside the player and in Saved. */
+.moments{margin:18px 0;padding:16px;border:1px solid var(--line2);border-radius:var(--r);background:var(--paper);box-shadow:var(--shadow)}
+.moments-head{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.moments-head h2{margin:0;font-size:18px;display:flex;gap:8px;align-items:center}
+.moment-count:not(:empty){padding:2px 7px;border-radius:20px;background:var(--sunk);color:var(--ink2);font-size:12px;font-weight:600;line-height:1.4}
+.moments-hint{margin:7px 0 12px;color:var(--ink2);font-size:14px}
+.moment-list{margin:0;padding:0;list-style:none}
+.moment-list>li{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line2);padding:8px 0;min-width:0}
+.moment-open{display:flex;align-items:center;gap:12px;flex:1;min-width:0;text-align:left;text-decoration:none;background:transparent;border:0;color:var(--ink);padding:6px 0;cursor:pointer;border-radius:var(--r-ctl)}
+.moment-time{flex:none;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--accent-soft);color:var(--accent);border-radius:var(--r-ctl);padding:5px 8px}
+.moment-name{min-width:0;overflow-wrap:anywhere}
+.moment-name b{display:block;font-size:15px;font-weight:600;line-height:1.4}
+.moment-name small{display:block;font-size:13px;color:var(--ink2);line-height:1.4;margin-top:2px}
+.moment-open:not(.unavailable):hover b{text-decoration:underline}
+.moment-open.unavailable{cursor:default;color:var(--ink2)}
+.moment-actions{display:flex;flex:none;gap:4px}
+.moment-actions button{min-height:38px;padding:6px 8px;border:0;border-radius:var(--r-ctl);background:transparent;color:var(--ink2);font-size:13px}
+.moment-actions button:hover{background:var(--sunk);color:var(--ink)}
+.moment-empty{color:var(--ink2);font-size:14px}
+.moment-form{padding:14px;margin:12px 0;border:1px solid var(--line);border-radius:var(--r-ctl);background:var(--bg)}
+.moment-form-title{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-weight:600}
+.moment-form label{display:block;font-size:14px;margin-bottom:6px}
+.moment-form input{display:block;width:100%;min-width:0;min-height:44px;padding:8px 12px;border:1px solid var(--field-line);border-radius:var(--r-ctl);background:var(--paper);color:var(--ink)}
+.moment-form-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.moment-status{margin:10px 0 0;font-size:14px;color:var(--ink2);overflow-wrap:anywhere}
+.moment-status:empty{display:none}
+.moment-status.is-error{color:var(--ink);font-weight:600}
+@media(max-width:639px){.moment-list>li{flex-wrap:wrap}.moment-open{flex-basis:100%}.moment-actions{margin-left:auto}.moment-actions button{min-height:44px}.moments-head .btn{white-space:normal;text-align:left}}
+
 /* ---------- search ---------- */
 .results .result{padding:16px 0;border-top:1px solid var(--line2)}
 .result h3 a{color:var(--ink);text-decoration:none;font-size:18px}

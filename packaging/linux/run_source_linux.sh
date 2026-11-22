@@ -77,8 +77,8 @@ LASTBOOK_LIBRARY="$(realpath "$DATA")/library-data"   # what engine/paths.py set
 command -v gst-launch-1.0 >/dev/null || { echo "--check needs gst-launch-1.0 (Arch: gstreamer, Ubuntu: gstreamer1.0-tools)" >&2; exit 1; }
 shift 2
 if [ $# -eq 0 ]; then   # by default the first three videos in the library
-  mapfile -t vids < <(cd "$LASTBOOK_LIBRARY" && find -L videos -type f \( -name '*.mp4' -o -name '*.webm' -o -name '*.mkv' \) | sort | head -3)
-  set -- "${vids[@]}"
+  # read into the arguments themselves: bash 3.2 on macOS has no mapfile
+  while IFS= read -r vid; do set -- "$@" "$vid"; done < <(cd "$LASTBOOK_LIBRARY" && find -L videos -type f \( -name '*.mp4' -o -name '*.webm' -o -name '*.mkv' \) | sort | head -3)
 fi
 [ $# -gt 0 ] || { echo "no videos found under $LASTBOOK_LIBRARY/videos" >&2; exit 1; }
 fail=0

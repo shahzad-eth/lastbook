@@ -44,7 +44,10 @@ process.stdout.write(JSON.stringify({
   fold: (cases.fold || []).map(s => W.fold(s)),
   words: (cases.words || []).map(q => safe(() => W.queryWords(q, stop))),
   tops: (cases.tops || []).map(q => safe(() => W.rankTopics(q, cases.topics, stop).map(o => [o.t.id, o.c ? o.c.id : null]))),
+  // The same searches ranked with the guides' phrases taken out, to compare with.
+  topsPlain: (cases.topsPlain || []).map(q => safe(() => W.rankTopics(q, cases.plainTopics, stop).map(o => [o.t.id, o.c ? o.c.id : null]))),
   match: (cases.match || []).map(([text, w]) => safe(() => W.matcher(text)(w))),
   rank: (cases.rank || []).map(q => ({ q, now: safe(() => brief(W.rankTopics(q, cases.topics, stop))), before: brief(before(q, cases.topics)) })),
   rankOwn: (cases.rankOwn || []).map(([q, topics]) => safe(() => brief(W.rankTopics(q, topics, stop)))),
+  rankForms: (cases.rankForms || []).map(([q, topics]) => safe(() => brief(W.rankTopics(q, topics, stop)))),
 }));

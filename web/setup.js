@@ -5,6 +5,7 @@
 (() => {
   const $ = s => document.querySelector(s);
   const main = $('#main'), live = $('#live');
+  const languageHasFocus = () => $('#languageSettings')?.contains(document.activeElement);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const WIN = document.documentElement.classList.contains('plat-win');
   const UNIT = WIN ? 1024 : 1000;   // each system's own way of counting a gigabyte, so the numbers match Finder or Explorer
@@ -150,7 +151,12 @@
 
   async function load() {
     try { S = await call('state') }
-    catch (e) { main.innerHTML = `<div class="s-err" role="alert">${ico('warn')}<div><b>Setup could not start.</b><p>${esc(e.message)}</p><p><button class="btn" id="again">Try again</button></p></div></div>`; $('#again').onclick = load; return }
+    catch (e) {
+      main.innerHTML = `<div class="s-err" role="alert">${ico('warn')}<div><b data-i18n="setup.error">Setup could not start.</b><p>${esc(e.message)}</p><p><button class="btn" id="again" data-i18n="setup.tryAgain">Try again</button></p></div></div>`;
+      globalThis.LastbookI18n?.apply(main);
+      $('#again').onclick = load;
+      return;
+    }
     const rf = (S.recommend || {}).folder;
     folder = folder || (cur() && cur().folder) || S.default_folder || (rf ? asData(rf) : '');
     if (!choice.pack) {
@@ -177,7 +183,7 @@
     else if (view === 'job') jobView(S.job);
     else if (view === 'done') doneView();
     else if (view === 'copy') copyView();
-    if (focus) { const h = main.querySelector('h1'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }) } scrollTo(0, 0) }
+    if (focus && !languageHasFocus()) { const h = main.querySelector('h1'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }) } scrollTo(0, 0) }
   }
   function go(v) { view = v; confirmCancel = confirmRemove = confirmOld = false; note = ''; if (v === 'manage' || v === 'choose') repair = null; render(true) }
 
@@ -227,14 +233,14 @@
       : f.size_ok === false ? '' : `<div class="s-found">${ico(f.kind === 'library' ? 'folder' : 'file')}<span><b>${esc(f.kind === 'library' ? 'A Lastbook library' : f.kind === 'model' ? 'The local AI file' : (packById(f.id) ? packById(f.id).title + ' library' : f.title || f.name))}</b><small>${esc(home(f.path))}${f.size ? ' · ' + size(f.size) : ''}</small></span>
         <button class="btn plain" data-use="${i}">Use the file you already have</button></div>`).join('');
 
-    main.innerHTML = `${c ? `<button class="s-link" id="toManage">${ico('back')}<span>Library and local AI</span></button>` : ''}
-      <h1>${c ? 'Change the library' : 'Set up Lastbook'}</h1>
-      ${c ? '' : '<p class="lead">Choose your state and library. Lastbook downloads them for offline use.</p>'}
+    main.innerHTML = `${c ? `<button class="s-link" id="toManage">${ico('back')}<span data-i18n="setup.settingsTitle">Library and local AI</span></button>` : ''}
+      ${c ? '<h1 data-i18n="setup.changeLibrary">Change the library</h1>' : '<h1 data-i18n="setup.title">Set up Lastbook</h1>'}
+      ${c ? '' : '<p class="lead" data-i18n="setup.chooseIntro">Choose your state and library. Lastbook downloads them for offline use.</p>'}
       ${computer()}
       ${c ? '' : recommendLine()}
       ${found ? `<h2>Found on this computer</h2><div class="s-founds">${found}</div>` : ''}
       <section id="mapBox" class="s-map-panel" aria-label="Your local map"></section>
-      <h2 id="packH">Library</h2>
+      <h2 id="packH" data-i18n="nav.library">Library</h2>
       <div class="s-opts" role="radiogroup" aria-labelledby="packH">${packCards}</div>
       ${ai ? `<h2>Local AI</h2>${ai}` : ''}
       <section class="s-sum" id="sum" aria-live="polite"></section>
@@ -253,6 +259,7 @@
     $('#haveFile').onclick = () => haveLibrary(true);
     mapSection();
     summary();
+    globalThis.LastbookI18n?.apply(main);
   }
   /* Map geometry and address indexes are separate downloads, chosen by state. */
   function mapSection() {
@@ -357,7 +364,7 @@
     const o = [].concat(c.old || [])[0], old = o ? (typeof o === 'string' ? { path: o } : o) : null;   // the engine lists the paths it moved aside
     const larger = packs().filter(x => (x.installed_bytes || 0) > ((p && p.installed_bytes) || 0));
     const bigger = larger.filter(x => x.available !== false), later = larger.find(x => x.available === false);
-    main.innerHTML = `<h1>Library and local AI</h1>
+    main.innerHTML = `<h1 data-i18n="setup.settingsTitle">Library and local AI</h1>
       <div class="s-have">
         <div class="s-row">${ico('book', 's-ri')}<span><b>${esc(p ? p.title : c.pack || 'Library')} library</b><small>${libraryUpdate ? 'Updated edition available · ' : p ? size(p.installed_bytes) + ' · ' : ''}${esc(home(c.folder))}</small></span>
           ${libraryUpdate ? `<button class="btn" id="libraryUpdate">Update ${esc(p.title)}</button>` : bigger.length ? `<button class="btn" id="upgrade">${ico('up')}Get ${esc(bigger[0].title)}</button>` : later ? `<span class="s-badge later">${esc(later.title)} comes later</span>` : '<span class="s-badge here">The largest</span>'}</div>
@@ -369,7 +376,7 @@
       </div>
       ${old ? `<div class="s-row s-old">${ico('folder', 's-ri')}<span><b>The old library is still here</b><small>${esc(home(old.path))}${old.bytes ? ' · ' + size(old.bytes) : ''}</small></span>${confirmOld ? `<span class="s-confirm"><span>Delete it for good?</span><button class="btn danger" id="oldYes">Delete</button><button class="btn plain" id="oldNo">Keep</button></span>` : `<button class="btn plain" id="rmOld">${ico('trash')}Delete it</button>`}</div>` : ''}
       ${computer()}
-      <div class="s-have"><div class="s-row">${ico('folder', 's-ri')}<span><b>Copy for someone else</b><small>Puts this library on a drive, with a START-HERE.txt, so someone can set up Lastbook with no internet. Nothing of yours is copied.</small></span><button class="btn plain" id="copyOut">Copy to a drive…</button></div></div>
+      <div class="s-have"><div class="s-row">${ico('folder', 's-ri')}<span><b data-i18n="setup.copyTitle">Copy for someone else</b><small>Puts this library on a drive, with a START-HERE.txt, so someone can set up Lastbook with no internet. Nothing of yours is copied.</small></span><button class="btn plain" id="copyOut">Copy to a drive…</button></div></div>
       <div class="s-go left">${CAN.repair ? `<button class="btn plain" id="repair">${ico('repair')}Check and repair</button>` : ''}
         <button class="s-link" id="otherLib">${ico('folder')}Open another library folder</button></div>
       <p class="s-note${noteOk ? ' ok' : ''}" id="haveNote"${note ? '' : ' hidden'}>${esc(note)}</p>`;
@@ -394,13 +401,14 @@
       if (!r || r.error) { note = (r && r.error) || 'Repair could not start.'; manageView(); return }
       repair = { fixed: false, sure: true }; S.job = r; go('job'); poll();
     };
+    globalThis.LastbookI18n?.apply(main);
   }
   /* ---- copy for someone else (#114): what goes onto the drive, and what does not */
   let copyTo = null;
   function copyView() {
     const c = cur() || {}, p = packById(c.pack), r = copyTo || {};
     const need = p && p.installed_bytes;
-    main.innerHTML = `<h1>Copy for someone else</h1>
+    main.innerHTML = `<h1 data-i18n="setup.copyTitle">Copy for someone else</h1>
       <p class="lead">Copy the ${esc(p ? p.title : 'Lastbook')} library${need ? ` (${size(need)})` : ''} to ${esc(r.disk || home(r.path || ''))}, with a START-HERE.txt that says how to set it up on another computer.</p>
       <div class="s-have"><div class="s-row">${ico('folder', 's-ri')}<span><b>${esc(home(r.path || ''))}</b><small>${r.free_bytes != null ? size(r.free_bytes) + ' free there' : ''}</small></span></div></div>
       <p class="s-note">Not copied: your settings, saved things, chats, notes, address search and the local AI. Only the library’s own files go onto the drive, and each is read back from the drive to make sure it arrived whole.</p>
@@ -413,6 +421,7 @@
       if (!x || x.error) { note = (x && x.error) || 'The copy could not start.'; copyView(); return }
       repair = null; S.job = x; go('job'); poll();
     };
+    globalThis.LastbookI18n?.apply(main);
   }
   function copiedView() {
     const r = (S.job && S.job.result) || {};
@@ -545,8 +554,10 @@
           : jobControls(j)}</div>`}`;
       main.querySelectorAll('[data-act]').forEach(b => b.onclick = () => jobAct(b.dataset.act, b));
       const again = had && main.querySelector(`[data-act="${had}"]`) || (had && main.querySelector('[data-act]'));
-      if (again) again.focus();
-      else if (first) { const h = main.querySelector('h1'); h.tabIndex = -1; h.focus({ preventScroll: true }) }
+      if (!languageHasFocus()) {
+        if (again) again.focus();
+        else if (first) { const h = main.querySelector('h1'); h.tabIndex = -1; h.focus({ preventScroll: true }) }
+      }
       const s = j.state === 'failed' ? '' : head + (j.items.find(i => ACTIVE.has(i.state)) ? ': ' + WORD[j.items.find(i => ACTIVE.has(i.state)).state] + ' ' + j.items.find(i => ACTIVE.has(i.state)).title : '');
       if (s && live.textContent !== s) live.textContent = s;
     }
@@ -614,7 +625,7 @@
 
   /* keyboard: Escape closes a question that is open */
   addEventListener('keydown', e => {
-    if (e.key !== 'Escape') return;
+    if (e.key !== 'Escape' || languageHasFocus()) return;
     if (confirmCancel) { confirmCancel = false; jobView(S.job); const b = main.querySelector('[data-act="cancel"]'); if (b) b.focus() }
     else if (confirmRemove || confirmOld) { const f = confirmRemove ? '#rmAi' : '#rmOld'; confirmRemove = confirmOld = false; manageView(); $(f).focus() }
   });

@@ -302,7 +302,7 @@ def plan_update(lib, new):
     kept maps each kind to [(path, bytes)], sorted; kept_bytes to their total. map is the installed map's name, or None."""
     lib = Path(lib)
     installed = read_pack_manifest(lib / 'pack-manifest.tsv')
-    own_map = map_set(lib) is not None
+    own_map = has_separate_map(lib, pack_lists_map=any(rel == 'map-set.json' for rel, _, _ in installed))
     map_paths = set(map_files(lib)) if own_map else set()
 
     def pack_side(rows):
@@ -464,6 +464,27 @@ def map_name(lib):
         return str(json.loads((Path(lib) / 'pack.json').read_text(encoding='utf-8')).get('map') or 'base')
     except (OSError, ValueError, AttributeError):
         return 'base'
+
+
+def has_separate_map(lib, *, pack_lists_map=None):
+    """Does the library hold a map set installed apart from its pack (a state map), rather than the pack's own (All's whole US)?
+    The pack's own set is named by pack.json's `map`, and its map-set.json is listed in pack-manifest.tsv with its other files,
+    so they are checked and fetched with the pack. Ownership never depends on map-set.json's contents being whole: a damaged one
+    of the pack's own then shows up as a damaged pack file.
+
+    Callers that have read the pack manifest can supply whether it lists map-set.json."""
+    lib = Path(lib)
+    d = map_set(lib)
+    if not d:
+        return False
+    try:
+        own = json.loads((lib / 'pack.json').read_text(encoding='utf-8')).get('map')
+        if pack_lists_map is None:
+            pack_lists_map = any(line.split('\t', 1)[0] == 'map-set.json'
+                                 for line in (lib / 'pack-manifest.tsv').read_text(encoding='utf-8').splitlines()[1:])
+    except (OSError, ValueError, AttributeError):
+        return True
+    return not (pack_lists_map and d.get('name') == own)
 
 
 def check_map(lib):

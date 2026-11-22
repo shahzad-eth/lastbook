@@ -64,7 +64,7 @@ pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [('X utf8', None, 'OPTION')], exclude_binaries=True, name='Lastbook', console=False, argv_emulation=False, target_arch='arm64', codesign_identity=None, entitlements_file=None)
 coll = COLLECT(exe, a.binaries, a.datas, name='Lastbook')
 ICON = Path(SPECPATH) / 'Lastbook.icns'
-app = BUNDLE(coll, name='Lastbook.app', icon=str(ICON) if ICON.exists() else None, bundle_identifier='local.lastbook.desktop', version='1.1.14', info_plist={
+app = BUNDLE(coll, name='Lastbook.app', icon=str(ICON) if ICON.exists() else None, bundle_identifier='local.lastbook.desktop', version='1.1.15', info_plist={
     'CFBundleDisplayName': 'Lastbook',
     'CFBundleName': 'Lastbook',
     'LSApplicationCategoryType': 'public.app-category.reference',

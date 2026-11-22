@@ -3,21 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Set up Lastbook</title>
+<title data-i18n="setup.title">Set up Lastbook</title>
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="/ui/icon.svg" type="image/svg+xml">
 <script src="/ui/plat.js?v=2"></script>
 <link rel="stylesheet" href="/ui/app.css?v=23">
-<link rel="stylesheet" href="/ui/setup.css?v=4">
+<link rel="stylesheet" href="/ui/setup.css?v=5">
 </head>
 <body class="setup">
-<header class="s-top">
+<header class="s-top" aria-label="Set up Lastbook" data-i18n-aria-label="setup.title" data-i18n-lang>
   <span class="s-brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 6v6c0 5 3.8 9.3 9 10 5.2-.7 9-5 9-10V6z" fill="currentColor" fill-opacity=".2"/><path d="M12 2 3 6v6c0 5 3.8 9.3 9 10 5.2-.7 9-5 9-10V6z M8 12l3 3 5-6"/></svg><span>Lastbook</span></span>
-  <a class="s-back" id="sBack" href="/#/library" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6"/></svg><span>Back to the library</span></a>
+  <a class="s-back" id="sBack" href="/#/library" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6"/></svg><span data-i18n="setup.back">Back to the library</span></a>
 </header>
-<main id="main" class="s-main" tabindex="-1"><p class="loading">Looking at this computer…</p></main>
+<form id="languageSettings" class="s-language" hidden>
+  <div class="s-language-controls">
+    <label for="interfaceLanguage" data-i18n="language.label">Interface language</label>
+    <select id="interfaceLanguage" aria-describedby="languagePreview">
+      <option value="en" lang="en">English</option>
+      <option value="es-419" lang="es-419">Español (Latinoamérica)</option>
+    </select>
+    <button type="submit" class="btn plain" data-i18n="language.save">Save language</button>
+  </div>
+  <p id="languagePreview" data-i18n="language.preview">The Latin American Spanish preview covers navigation and parts of Setup. The rest of the interface is in English.</p>
+  <p id="languageStatus" role="status" aria-live="polite" aria-atomic="true"></p>
+</form>
+<main id="main" class="s-main" tabindex="-1"><p class="loading" data-i18n="setup.loading">Looking at this computer…</p></main>
 <p class="sr" id="live" aria-live="polite"></p>
 <noscript><p class="noscript">Lastbook needs JavaScript.</p></noscript>
-<script src="/ui/setup.js?v=10"></script>
+<script src="/ui/i18n-core.js?v=3"></script>
+<script src="/ui/i18n-dom.js?v=3"></script>
+<script src="/ui/i18n-en.js?v=3"></script>
+<script src="/ui/i18n-locales.js?v=3"></script>
+<script src="/ui/i18n-app.js?v=3"></script>
+<script src="/ui/setup.js?v=11"></script>
 </body>
 </html>

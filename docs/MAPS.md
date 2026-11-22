@@ -149,6 +149,29 @@ as one map.
 
 [REGIONS-MX.md](REGIONS-MX.md) does the same for Mexico's 32 states (entidades federativas).
 
+[REGIONS-BR.md](REGIONS-BR.md) does the same for Brazil's 26 states and the Federal District (Distrito Federal), 27 in all.
+
+### To do: maps for every place on Earth
+
+The goal is a detailed map for any place a person lives.
+
+- [ ] **Region ids.** The manifest already accepts map ids such as `DE-BE` and `CA-ON`. Address-index ids in
+  `engine/setup/manifest.py` and the address-index filenames carried over by `engine/setup/install.py` still use
+  two capital letters. The map builders in `packaging/state_maps.py` and `packaging/build_packs.py` use US regions.
+  Most proposals above use ISO 3166-2 ids to avoid reusing US state codes such as `DE` and `CA`.
+- [ ] **Sources.** Pick an open replacement for each US dataset, region by region, with its licence. The region
+  proposals above do this.
+- [ ] **No Southern California box.** `server.py` assumes `map.sqlite` covers Southern California (`_poi_sources`,
+  `socal_classes`).
+- [ ] **Setup.** First run asks for a US state map (#267). Installing several maps or a locally built map through
+  Setup is #53. A hand-built library already opens with [`--data`](#opening-a-locally-built-map-on-windows).
+- [ ] **Address search.** It knows US state names and US street words. Other countries write the number after the
+  street, fold accents, or have no postcode.
+- [ ] **Units.** The map shows distances in miles above 1.6 km and contour lines in feet (`web/map.js`).
+- [ ] **Emergency number** for the person's country (#261).
+
+The design discussion is in #23, #25, #31 and #95.
+
 ## Checking a map change
 
 - A change to a layer in `web/map.js` is a change you can see: include screenshots in light and dark mode.
